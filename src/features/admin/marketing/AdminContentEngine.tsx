@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import {
   RefreshCw, Calendar, Video, Image, Monitor, Copy, Check,
   ChevronDown, ChevronUp, Zap, TriangleAlert as AlertTriangle,
-  Star, TrendingUp, FileText, Eye, Play,
+  Star, TrendingUp, FileText, Eye, Play, Mic, ChevronRight,
 } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { useToast } from "@/hooks/use-toast";
@@ -11,7 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 
 type PostType = "Video" | "Image" | "Screen Recording";
 type PostCategory = "Value" | "Breakout" | "Trap" | "Captain" | "Proof";
-type PostTab = "script" | "hooks" | "visual" | "caption";
+type PostTab = "voice" | "hooks" | "visual" | "caption";
 
 interface PostPlan {
   day: number;
@@ -21,10 +21,13 @@ interface PostPlan {
   player_name: string;
   player_id: number;
   team: string;
-  hook_options: string[];
-  full_script: string;
+  hooks: string[];
+  hook_options?: string[];
+  voice_script: string;
+  full_script?: string;
+  caption_script: string;
+  caption?: string;
   visual_plan: string;
-  caption: string;
 }
 
 interface DayPlan {
@@ -35,6 +38,13 @@ interface DayPlan {
 interface WeeklyPlan {
   week_key: string;
   days: DayPlan[];
+}
+
+interface PlayerOption {
+  player_id: number;
+  player_name: string;
+  team: string;
+  neeko_rating_scaled: number | null;
 }
 
 // ── CONSTANTS ─────────────────────────────────────────────────────────────────
@@ -54,10 +64,10 @@ const POST_TYPE_ICON: Record<PostType, React.ElementType> = {
 };
 
 const POST_TABS: { id: PostTab; label: string; icon: React.ElementType }[] = [
-  { id: "script",  label: "Script",      icon: FileText },
-  { id: "hooks",   label: "Hooks",       icon: Play },
-  { id: "visual",  label: "Visual Plan", icon: Eye },
-  { id: "caption", label: "Caption",     icon: Copy },
+  { id: "voice",   label: "Voice Script",  icon: Mic },
+  { id: "hooks",   label: "Hooks",         icon: Play },
+  { id: "visual",  label: "Visual Plan",   icon: Eye },
+  { id: "caption", label: "Caption",       icon: FileText },
 ];
 
 const DAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
@@ -74,6 +84,18 @@ function useCopy() {
   return { copied, copy };
 }
 
+function getVoiceScript(post: PostPlan): string {
+  return post.voice_script || post.full_script || "";
+}
+
+function getCaptionScript(post: PostPlan): string {
+  return post.caption_script || post.caption || "";
+}
+
+function getHooks(post: PostPlan): string[] {
+  return (post.hooks?.length ? post.hooks : post.hook_options) ?? [];
+}
+
 // ── POST DETAIL PANEL ─────────────────────────────────────────────────────────
 
 function PostDetailPanel({
@@ -85,32 +107,32 @@ function PostDetailPanel({
   onRegenerate: (post: PostPlan) => void;
   regenerating: boolean;
 }) {
-  const [activeTab, setActiveTab] = useState<PostTab>("script");
+  const [activeTab, setActiveTab] = useState<PostTab>("voice");
   const { copied, copy } = useCopy();
   const catMeta = CATEGORY_META[post.category] ?? CATEGORY_META.Value;
 
   const getTabContent = (): string => {
     switch (activeTab) {
-      case "script":  return post.full_script;
-      case "hooks":   return post.hook_options.join("\n\n");
-      case "visual":  return post.visual_plan;
-      case "caption": return post.caption;
+      case "voice":   return getVoiceScript(post);
+      case "hooks":   return getHooks(post).join("\n\n");
+      case "visual":  return typeof post.visual_plan === "string" ? post.visual_plan : JSON.stringify(post.visual_plan, null, 2);
+      case "caption": return getCaptionScript(post);
     }
   };
 
   const copyAll = () => {
+    const hooks = getHooks(post);
     const all = [
-      `=== SCRIPT ===\n${post.full_script}`,
-      `=== HOOKS ===\n${post.hook_options.join("\n\n")}`,
-      `=== VISUAL PLAN ===\n${post.visual_plan}`,
-      `=== CAPTION ===\n${post.caption}`,
+      `=== VOICE SCRIPT ===\n${getVoiceScript(post)}`,
+      `=== HOOKS ===\n${hooks.join("\n\n")}`,
+      `=== VISUAL PLAN ===\n${typeof post.visual_plan === "string" ? post.visual_plan : JSON.stringify(post.visual_plan, null, 2)}`,
+      `=== CAPTION ===\n${getCaptionScript(post)}`,
     ].join("\n\n---\n\n");
     copy(all, "all");
   };
 
   return (
     <div className="border border-border rounded-lg overflow-hidden bg-background">
-      {/* Header */}
       <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-border bg-muted/20">
         <div className="flex items-center gap-2 flex-wrap">
           <span className={`inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded ${catMeta.bg} ${catMeta.color}`}>
@@ -138,7 +160,6 @@ function PostDetailPanel({
         </div>
       </div>
 
-      {/* Tabs */}
       <div className="flex gap-1 px-4 pt-3 overflow-x-auto" style={{ scrollbarWidth: "none" }}>
         {POST_TABS.map(({ id, label, icon: Icon }) => (
           <button
@@ -156,7 +177,6 @@ function PostDetailPanel({
         ))}
       </div>
 
-      {/* Content */}
       <div className="p-4">
         <div className="flex items-center justify-between mb-2">
           <p className="text-xs text-muted-foreground uppercase tracking-wide font-medium">
@@ -172,7 +192,7 @@ function PostDetailPanel({
 
         {activeTab === "hooks" ? (
           <div className="space-y-2">
-            {post.hook_options.map((hook, i) => (
+            {getHooks(post).map((hook, i) => (
               <div key={i} className="flex items-start gap-2 p-3 bg-muted/30 border border-border rounded-md">
                 <span className="text-xs text-muted-foreground font-mono shrink-0 mt-0.5">{i + 1}.</span>
                 <p className="text-sm flex-1 leading-relaxed">{hook}</p>
@@ -212,6 +232,7 @@ function PostCard({
   const catMeta = CATEGORY_META[post.category] ?? CATEGORY_META.Value;
   const TypeIcon = POST_TYPE_ICON[post.post_type] ?? Video;
   const CatIcon = catMeta.icon;
+  const hooks = getHooks(post);
 
   return (
     <button
@@ -234,10 +255,16 @@ function PostCard({
       </div>
       <p className="font-semibold text-sm leading-tight truncate">{post.player_name}</p>
       <p className="text-xs text-muted-foreground truncate mb-1.5">{post.team}</p>
-      {post.hook_options?.[0] && (
+      {hooks[0] && (
         <p className="text-[10px] text-muted-foreground/80 leading-snug line-clamp-2 font-mono">
-          {post.hook_options[0]}
+          {hooks[0]}
         </p>
+      )}
+      {isSelected && (
+        <div className="flex items-center gap-1 mt-2 text-[10px] text-muted-foreground">
+          <ChevronRight className="h-3 w-3" />
+          <span>Tap to view content</span>
+        </div>
       )}
     </button>
   );
@@ -264,7 +291,6 @@ function DayRow({
 
   return (
     <div className="border border-border rounded-lg overflow-hidden">
-      {/* Day header */}
       <button
         onClick={() => setExpanded((v) => !v)}
         className="w-full flex items-center justify-between gap-3 px-4 py-3 hover:bg-muted/20 transition-colors"
@@ -294,10 +320,8 @@ function DayRow({
         {expanded ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
       </button>
 
-      {/* Day content */}
       {expanded && (
         <div className="border-t border-border p-4 space-y-4">
-          {/* Post cards grid */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
             {dayPlan.posts.map((post) => (
               <PostCard
@@ -309,7 +333,6 @@ function DayRow({
             ))}
           </div>
 
-          {/* Selected post detail */}
           {isSelectedDay && selectedPost && (
             <PostDetailPanel
               post={selectedPost}
@@ -319,6 +342,53 @@ function DayRow({
           )}
         </div>
       )}
+    </div>
+  );
+}
+
+// ── PLAYER SELECTOR ───────────────────────────────────────────────────────────
+
+function PlayerSelector({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (name: string) => void;
+}) {
+  const [players, setPlayers] = useState<PlayerOption[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    supabase
+      .schema("afl")
+      .from("player_rankings_cache")
+      .select("player_id, player_name, team, neeko_rating_scaled")
+      .eq("is_available", true)
+      .not("projection_final", "is", null)
+      .order("neeko_rating_scaled", { ascending: false, nullsFirst: false })
+      .limit(50)
+      .then(({ data }) => {
+        if (data) setPlayers(data as PlayerOption[]);
+        setLoading(false);
+      });
+  }, []);
+
+  return (
+    <div className="flex items-center gap-2">
+      <label className="text-xs text-muted-foreground whitespace-nowrap">Focus player</label>
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        disabled={loading}
+        className="text-xs border border-border rounded-md px-2 py-1.5 bg-background text-foreground hover:border-foreground/40 transition-colors disabled:opacity-50 max-w-[200px]"
+      >
+        <option value="">Auto (AI picks)</option>
+        {players.map((p) => (
+          <option key={p.player_id} value={p.player_name}>
+            {p.player_name} ({p.team})
+          </option>
+        ))}
+      </select>
     </div>
   );
 }
@@ -334,15 +404,19 @@ export default function AdminContentEngine() {
   const [error, setError] = useState<string | null>(null);
   const [selectedPost, setSelectedPost] = useState<PostPlan | null>(null);
   const [regeneratingPost, setRegeneratingPost] = useState<string | null>(null);
+  const [focusPlayer, setFocusPlayer] = useState<string>("");
   const { toast } = useToast();
 
   const fetchPlan = useCallback(async (force = false) => {
     setLoading(true);
     setError(null);
     try {
+      const body: Record<string, unknown> = { force };
+      if (focusPlayer) body.player_name = focusPlayer;
+
       const { data, error: fnError } = await supabase.functions.invoke(
         "generate-weekly-content",
-        { body: { force } }
+        { body }
       );
 
       if (fnError) throw new Error(fnError.message ?? "Edge function error");
@@ -374,11 +448,11 @@ export default function AdminContentEngine() {
       setLoading(false);
       setGenerating(false);
     }
-  }, [toast]);
+  }, [toast, focusPlayer]);
 
   useEffect(() => {
     fetchPlan(false);
-  }, [fetchPlan]);
+  }, []);
 
   const handleRegenerateWeek = () => {
     setGenerating(true);
@@ -389,33 +463,33 @@ export default function AdminContentEngine() {
     const key = `${post.day}-${post.post_number}`;
     setRegeneratingPost(key);
     try {
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string;
-      const anonKey     = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
-      const { data: { session } } = await supabase.auth.getSession();
-      const token = session?.access_token ?? anonKey;
+      const { data, error: fnError } = await supabase.functions.invoke(
+        "generate-content-pack",
+        {
+          body: {
+            player_id: post.player_id,
+            category: post.category.toLowerCase(),
+          },
+        }
+      );
 
-      const res = await fetch(`${supabaseUrl}/functions/v1/generate-content-pack`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          player_id: post.player_id,
-          category: post.category.toLowerCase(),
-        }),
-      });
+      if (fnError) throw new Error(fnError.message ?? "Regeneration failed");
+      if (!data?.ok) throw new Error(data?.error ?? "Regeneration returned not-ok");
 
-      const json = await res.json();
-      if (!res.ok || !json.ok) throw new Error(json.error ?? "Regeneration failed");
-
-      const newPack = json.pack;
+      const newPack = data.pack;
       const updatedPost: PostPlan = {
         ...post,
-        full_script:  newPack.video_script ?? post.full_script,
-        hook_options: newPack.hooks ?? post.hook_options,
-        visual_plan:  newPack.visual_plan ?? post.visual_plan,
-        caption:      newPack.caption ?? post.caption,
+        voice_script:   newPack.voice_script ?? newPack.video_script ?? post.voice_script,
+        full_script:    newPack.voice_script ?? newPack.video_script ?? post.full_script,
+        hooks:          newPack.hooks ?? post.hooks,
+        hook_options:   newPack.hooks ?? post.hook_options,
+        visual_plan:    typeof newPack.visual_plan === "string"
+                          ? newPack.visual_plan
+                          : newPack.visual_plan
+                          ? JSON.stringify(newPack.visual_plan, null, 2)
+                          : post.visual_plan,
+        caption_script: newPack.caption_script ?? newPack.caption ?? post.caption_script,
+        caption:        newPack.caption_script ?? newPack.caption ?? post.caption,
       };
 
       setPlan((prev) => {
@@ -462,7 +536,8 @@ export default function AdminContentEngine() {
               : "No plan loaded"}
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          <PlayerSelector value={focusPlayer} onChange={setFocusPlayer} />
           {isCached && (
             <span className="text-[10px] text-muted-foreground border border-border px-2 py-1 rounded-md">
               Cached · regenerates weekly

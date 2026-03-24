@@ -61,32 +61,45 @@ function fmtPlayer(p: PlayerData, rank: number): string {
 }
 
 function buildSystemPrompt(): string {
-  return `You are an elite AFL Fantasy analyst AND high-converting sports advertiser for Neeko Sports.
+  return `You are an elite AFL Fantasy analyst AND high-converting sports content creator for Neeko Sports.
 
-Your job is to generate DAILY short-form content that drives engagement, builds authority, and converts viewers into subscribers.
+You write two distinct scripts per post:
 
-These scripts will be READ OUT LOUD by a human or AI voice (ElevenLabs). They must sound natural, confident, and persuasive.
+1. VOICE SCRIPT — written to be READ OUT LOUD by AI voice (ElevenLabs). Natural speech rhythm. Use "..." for pauses and "—" for emphasis breaks. No bullet points. 20-30 seconds when spoken aloud.
+
+2. CAPTION SCRIPT — written for TikTok/Instagram caption. Punchy, scroll-stopping. Includes hashtags.
+
+You also write:
+- 3 HOOKS — one emotional, one data-driven, one aggressive/controversial
+- VISUAL PLAN — plain text scene-by-scene breakdown (Scene 1, Scene 2, etc.) — NEVER an object, always a string
 
 RULES:
-- No weak takes, no hedging language
-- Every post must feel like insider knowledge
-- Use real stats naturally in speech form
-- Scripts written for speaking, not reading — include natural pauses with "..." or "—"
-- Neeko Sports CTA at the end of every script
-- No "Hey guys" openers
+- Voice scripts must sound like a confident analyst speaking, not reading
+- No weak takes, no hedging ("might", "could", "perhaps")
+- Every piece of content must feel like insider knowledge
+- Neeko Sports CTA in every voice script
+- Never start with "Hey guys" or "What's up"
 
-OUTPUT: Valid JSON only. No markdown code fences. No extra text before or after.`;
+OUTPUT: Valid JSON only. No markdown code fences. No extra text before or after the JSON.`;
 }
 
-function buildUserPrompt(players: PlayerData[], sel: ReturnType<typeof selectPlayers>): string {
+function buildUserPrompt(
+  players: PlayerData[],
+  sel: ReturnType<typeof selectPlayers>,
+  focusPlayerName?: string,
+): string {
   const { valuePlayers, breakoutPlayers, trapPlayers, captainPlayers, proofPlayers } = sel;
 
   const trapList = trapPlayers.length > 0
-    ? trapPlayers.map((p, i) => fmtPlayer(p, p.rank)).join("\n")
-    : "Pick top-ranked players with value_score below 5 from the list above";
+    ? trapPlayers.map((p) => fmtPlayer(p, p.rank)).join("\n")
+    : "Pick top-ranked players with value_score below 5 from the value list";
+
+  const focusNote = focusPlayerName
+    ? `\n\nFOCUS PLAYER: Prioritise "${focusPlayerName}" in the content where appropriate.\n`
+    : "";
 
   return `Generate a FULL 7-DAY AFL Fantasy content plan (21 posts total: 3 per day).
-
+${focusNote}
 PLAYER POOL:
 
 VALUE CANDIDATES:
@@ -115,24 +128,20 @@ RULES:
 - No duplicate players on the same day
 - Rotate players across the week (each player used max once)
 - Alternate Value/Breakout for Post 1 each day
-- Post 2 must be spicy/controversial — pick a fight with popular opinion
+- Post 2 must be spicy/controversial — challenge popular opinion
 
 ---
 
-FOR EACH POST OUTPUT:
+FOR EACH POST, OUTPUT EXACTLY:
 - post_type: "Video", "Image", or "Screen Recording"
 - category: "Value", "Breakout", "Trap", "Captain", or "Proof"
-- hook_options: exactly 3 hooks — scroll-stopping, emotional, aggressive
-- full_script: 20-30 second script for ElevenLabs voice delivery
-  Structure: Hook → Setup (player + context) → Stats → Strong take → CTA ("link in bio — Neeko Sports")
-- visual_plan: scene-by-scene breakdown:
-  Scene 1 (0-3s): exact text on screen, background, animation
-  Scene 2 (3-6s): player/team visual, colors, overlays
-  Scene 3 (6-12s): stats display, positioning, animation style
-  Scene 4 (12-20s): emphasis text, highlight words
-  Scene 5 (20-30s): CTA screen, Neeko branding
-  Include: color palette, font style, motion style, caption style
-- caption: TikTok/Instagram caption with hashtags
+- player_name: string
+- player_id: number
+- team: string
+- hooks: array of exactly 3 strings (emotional / data-driven / aggressive)
+- voice_script: 20-30 second spoken script for ElevenLabs — natural pauses with "..." and emphasis with "—"
+- caption_script: TikTok/Instagram caption with relevant hashtags
+- visual_plan: PLAIN TEXT scene-by-scene breakdown — Scene 1 (0-3s): ..., Scene 2 (3-6s): ..., etc. Must be a STRING not an object.
 
 ---
 
@@ -151,19 +160,48 @@ OUTPUT (strict JSON, no markdown fences):
           "player_name": "...",
           "player_id": 123,
           "team": "...",
-          "hook_options": ["...", "...", "..."],
-          "full_script": "...",
-          "visual_plan": "...",
-          "caption": "..."
-        },
-        { "day": 1, "post_number": 2, ... },
-        { "day": 1, "post_number": 3, ... }
+          "hooks": ["...", "...", "..."],
+          "voice_script": "...",
+          "caption_script": "...",
+          "visual_plan": "Scene 1 (0-3s): ... Scene 2 (3-6s): ..."
+        }
       ]
     }
   ]
 }
 
 Generate ALL 7 days = 21 posts total. Every post must be COMPLETE — nothing left blank.`;
+}
+
+function ensureString(val: unknown): string {
+  if (typeof val === "string") return val;
+  if (val === null || val === undefined) return "";
+  return JSON.stringify(val, null, 2);
+}
+
+function normalisePost(raw: Record<string, unknown>, day: number, postNumber: number): Record<string, unknown> {
+  const hooks: string[] = Array.isArray(raw.hooks)
+    ? (raw.hooks as unknown[]).map((h) => ensureString(h))
+    : Array.isArray(raw.hook_options)
+    ? (raw.hook_options as unknown[]).map((h) => ensureString(h))
+    : ["Hook 1", "Hook 2", "Hook 3"];
+
+  return {
+    day:            Number(raw.day ?? day),
+    post_number:    Number(raw.post_number ?? postNumber),
+    post_type:      ensureString(raw.post_type || "Video"),
+    category:       ensureString(raw.category || "Value"),
+    player_name:    ensureString(raw.player_name || "Unknown"),
+    player_id:      Number(raw.player_id ?? 0),
+    team:           ensureString(raw.team || "Unknown"),
+    hooks,
+    voice_script:   ensureString(raw.voice_script || raw.full_script || ""),
+    caption_script: ensureString(raw.caption_script || raw.caption || ""),
+    visual_plan:    ensureString(raw.visual_plan || ""),
+    hook_options:   hooks,
+    full_script:    ensureString(raw.voice_script || raw.full_script || ""),
+    caption:        ensureString(raw.caption_script || raw.caption || ""),
+  };
 }
 
 async function callOpenAI(systemPrompt: string, userPrompt: string): Promise<object> {
@@ -197,7 +235,20 @@ async function callOpenAI(systemPrompt: string, userPrompt: string): Promise<obj
   const content = data.choices?.[0]?.message?.content;
   if (!content) throw new Error("Empty response from OpenAI");
 
-  return JSON.parse(content);
+  const parsed = JSON.parse(content);
+
+  if (parsed?.days && Array.isArray(parsed.days)) {
+    parsed.days = parsed.days.map((d: Record<string, unknown>) => ({
+      ...d,
+      posts: Array.isArray(d.posts)
+        ? d.posts.map((p: Record<string, unknown>, i: number) =>
+            normalisePost(p, Number(d.day), i + 1)
+          )
+        : [],
+    }));
+  }
+
+  return parsed;
 }
 
 function buildFallbackPlan(players: PlayerData[], sel: ReturnType<typeof selectPlayers>): object {
@@ -225,14 +276,21 @@ function buildFallbackPlan(players: PlayerData[], sel: ReturnType<typeof selectP
           player_name: p1.player_name,
           player_id: p1.player_id,
           team: p1.team,
+          hooks: [
+            `${p1.player_name} is the most underpriced player in AFL Fantasy right now.`,
+            `Rank ${p1.rank}... projecting ${Math.round(p1.projection)} pts... value score ${p1.value_score.toFixed(1)}. The market hasn't caught up yet.`,
+            `Everyone's sleeping on ${p1.player_name}. That's a mistake.`,
+          ],
           hook_options: [
             `${p1.player_name} is the most underpriced player in AFL Fantasy right now.`,
-            `If you don't own ${p1.player_name} this week, you're already behind.`,
-            `This player's price hasn't caught up to his output — act before it does.`,
+            `Rank ${p1.rank}... projecting ${Math.round(p1.projection)} pts... value score ${p1.value_score.toFixed(1)}. The market hasn't caught up yet.`,
+            `Everyone's sleeping on ${p1.player_name}. That's a mistake.`,
           ],
-          full_script: `${p1.player_name}... ${p1.team}. Ranked in the top ${p1.rank} in the competition — projecting ${Math.round(p1.projection)} points at a value score of ${p1.value_score.toFixed(1)}. His ceiling? ${Math.round(p1.ceiling)}. That is elite output at a price the market hasn't caught yet. This is exactly the kind of pick that separates good teams from great ones. Full breakdown at Neeko Sports — link in bio.`,
-          visual_plan: `Scene 1 (0-3s): "${p1.player_name.toUpperCase()}" bold white text on black, green glow, fast zoom in.\nScene 2 (3-6s): Team color background, player name + team overlay, fade in.\nScene 3 (6-12s): Stat cards slide in from left — "Proj: ${Math.round(p1.projection)}pts", "Value: ${p1.value_score.toFixed(1)}", "Ceiling: ${Math.round(p1.ceiling)}pts".\nScene 4 (12-20s): "VALUE PICK" in bold green — pulse animation, highlight border.\nScene 5 (20-30s): Neeko Sports wordmark on dark bg, "Get the edge — link in bio".\nColors: #00C853 green on #0D0D0D. Font: Heavy sans-serif, all caps. Motion: 2-3s hard cuts, fast zoom transitions. Captions always on screen.`,
-          caption: `${p1.player_name} is a MUST-OWN this week. Proj ${Math.round(p1.projection)}pts, value score ${p1.value_score.toFixed(1)} — one of the best in the comp. Full analysis at Neeko Sports. #AFLFantasy #AFLSupercoach #ValuePick #${p1.team.replace(/\s+/g, "")}`,
+          voice_script: `${p1.player_name}... ${p1.team}. Ranked ${p1.rank} in the competition — projecting ${Math.round(p1.projection)} points... ceiling of ${Math.round(p1.ceiling)}. Value score? ${p1.value_score.toFixed(1)}. That is elite output at a price the market hasn't caught yet. This is exactly the kind of pick that separates the good teams from the great ones. Full breakdown at Neeko Sports — link in bio.`,
+          full_script: `${p1.player_name}... ${p1.team}. Ranked ${p1.rank} in the competition — projecting ${Math.round(p1.projection)} points... ceiling of ${Math.round(p1.ceiling)}. Value score? ${p1.value_score.toFixed(1)}. That is elite output at a price the market hasn't caught yet. This is exactly the kind of pick that separates the good teams from the great ones. Full breakdown at Neeko Sports — link in bio.`,
+          caption_script: `${p1.player_name} is a MUST-OWN this week. Proj ${Math.round(p1.projection)}pts, value score ${p1.value_score.toFixed(1)} — one of the best in the comp. Full analysis at Neeko Sports.\n\n#AFLFantasy #AFLSupercoach #ValuePick #${p1.team.replace(/\s+/g, "")}`,
+          caption: `${p1.player_name} is a MUST-OWN this week. Proj ${Math.round(p1.projection)}pts, value score ${p1.value_score.toFixed(1)} — one of the best in the comp. Full analysis at Neeko Sports.\n\n#AFLFantasy #AFLSupercoach #ValuePick #${p1.team.replace(/\s+/g, "")}`,
+          visual_plan: `Scene 1 (0-3s): "${p1.player_name.toUpperCase()}" bold white text on black, green glow, fast zoom in.\nScene 2 (3-6s): Team color background, player name + team overlay, fade in.\nScene 3 (6-12s): Stat cards slide in from left — "Proj: ${Math.round(p1.projection)}pts", "Value: ${p1.value_score.toFixed(1)}", "Ceiling: ${Math.round(p1.ceiling)}pts".\nScene 4 (12-20s): "VALUE PICK" in bold green — pulse animation, highlight border.\nScene 5 (20-30s): Neeko Sports wordmark on dark bg, "Get the edge — link in bio".\nColors: #00C853 green on #0D0D0D. Font: Heavy sans-serif, all caps. Motion: 2-3s hard cuts, fast zoom transitions.`,
         },
         {
           day,
@@ -242,14 +300,21 @@ function buildFallbackPlan(players: PlayerData[], sel: ReturnType<typeof selectP
           player_name: p2.player_name,
           player_id: p2.player_id,
           team: p2.team,
+          hooks: [
+            `Stop bringing in ${p2.player_name}. The data doesn't support it.`,
+            `${p2.player_name}... value score ${p2.value_score.toFixed(1)}... that's a red flag at that price.`,
+            `Everyone's picking ${p2.player_name} — that's exactly why you shouldn't.`,
+          ],
           hook_options: [
             `Stop bringing in ${p2.player_name}. The data doesn't support it.`,
+            `${p2.player_name}... value score ${p2.value_score.toFixed(1)}... that's a red flag at that price.`,
             `Everyone's picking ${p2.player_name} — that's exactly why you shouldn't.`,
-            `${p2.player_name} is the most dangerous trap in AFL Fantasy this week.`,
           ],
-          full_script: `${p2.player_name}... everyone's bringing him in. I get it — the name is familiar, the ranking looks okay. But look at the value score. ${p2.value_score.toFixed(1)}. At that price, you are overpaying. There are five better options available right now that the crowd hasn't found yet. Don't follow the herd. Use the data. Neeko Sports — link in bio.`,
-          visual_plan: `Scene 1 (0-3s): Red "TRAP ALERT" text with shake animation on dark background.\nScene 2 (3-6s): Player name in red overlay, caution icon.\nScene 3 (6-12s): Stat card — "Value: ${p2.value_score.toFixed(1)}" highlighted in red with "LOW" badge.\nScene 4 (12-20s): "AVOID" in bold red, X mark overlay, hard cut.\nScene 5 (20-30s): Neeko Sports logo — "Better picks inside — link in bio".\nColors: #D32F2F red on #0D0D0D. Font: Heavy bold, aggressive. Motion: Shake on reveal, hard cuts.`,
-          caption: `TRAP ALERT: ${p2.player_name} looks tempting but the data says avoid. Value score ${p2.value_score.toFixed(1)} — overpriced and over-hyped. Full trap breakdown at Neeko Sports. #AFLFantasy #TrapAlert #AFLSupercoach`,
+          voice_script: `${p2.player_name}... everyone's bringing him in. I get it — the name is familiar, the ranking looks fine. But the value score is ${p2.value_score.toFixed(1)}. At that price... you are overpaying. There are five better options available right now that the crowd hasn't found yet. Don't follow the herd — use the data. Neeko Sports — link in bio.`,
+          full_script: `${p2.player_name}... everyone's bringing him in. I get it — the name is familiar, the ranking looks fine. But the value score is ${p2.value_score.toFixed(1)}. At that price... you are overpaying. There are five better options available right now that the crowd hasn't found yet. Don't follow the herd — use the data. Neeko Sports — link in bio.`,
+          caption_script: `TRAP ALERT: ${p2.player_name} looks tempting but the data says avoid. Value score ${p2.value_score.toFixed(1)} — overpriced and over-hyped. Full trap breakdown at Neeko Sports.\n\n#AFLFantasy #TrapAlert #AFLSupercoach`,
+          caption: `TRAP ALERT: ${p2.player_name} looks tempting but the data says avoid. Value score ${p2.value_score.toFixed(1)} — overpriced and over-hyped. Full trap breakdown at Neeko Sports.\n\n#AFLFantasy #TrapAlert #AFLSupercoach`,
+          visual_plan: `Scene 1 (0-3s): Red "TRAP ALERT" text with shake animation on dark background.\nScene 2 (3-6s): Player name in red overlay, caution icon, hard cut.\nScene 3 (6-12s): Stat card — "Value: ${p2.value_score.toFixed(1)}" highlighted in red with "LOW" badge.\nScene 4 (12-20s): "AVOID" in bold red, X mark overlay.\nScene 5 (20-30s): Neeko Sports logo — "Better picks inside — link in bio".\nColors: #D32F2F red on #0D0D0D. Font: Heavy bold, aggressive. Motion: Shake on reveal, hard cuts.`,
         },
         {
           day,
@@ -259,14 +324,21 @@ function buildFallbackPlan(players: PlayerData[], sel: ReturnType<typeof selectP
           player_name: p3.player_name,
           player_id: p3.player_id,
           team: p3.team,
+          hooks: [
+            `This is the rankings data most AFL Fantasy coaches never see.`,
+            `Here's what Neeko's algorithm flagged this week — before anyone else.`,
+            `The algorithm called it. Here's the proof.`,
+          ],
           hook_options: [
             `This is the rankings data most AFL Fantasy coaches never see.`,
             `Here's what Neeko's algorithm flagged this week — before anyone else.`,
             `The algorithm called it. Here's the proof.`,
           ],
-          full_script: `This is the Neeko live rankings board. ${p3.player_name} — ranked #${p3.rank} — projecting ${Math.round(p3.projection)} points with a captain score of ${Math.round(p3.captain_score)}. This is the exact data our members are using to make trade decisions every single round. If you're building your team without this... you're working blind. Neeko Sports — link in bio.`,
+          voice_script: `This is the Neeko live rankings board. ${p3.player_name} — ranked ${p3.rank} — projecting ${Math.round(p3.projection)} points... captain score of ${Math.round(p3.captain_score)}. This is the exact data our members are using to make trade decisions every single round. If you're building your team without this... you're working blind. Neeko Sports — link in bio.`,
+          full_script: `This is the Neeko live rankings board. ${p3.player_name} — ranked ${p3.rank} — projecting ${Math.round(p3.projection)} points... captain score of ${Math.round(p3.captain_score)}. This is the exact data our members are using to make trade decisions every single round. If you're building your team without this... you're working blind. Neeko Sports — link in bio.`,
+          caption_script: `This is what Neeko's live rankings look like. ${p3.player_name} at #${p3.rank} — the algorithm doesn't miss. Get full access at Neeko Sports.\n\n#AFLFantasy #DataDriven #NeekoSports #AFLSupercoach`,
+          caption: `This is what Neeko's live rankings look like. ${p3.player_name} at #${p3.rank} — the algorithm doesn't miss. Get full access at Neeko Sports.\n\n#AFLFantasy #DataDriven #NeekoSports #AFLSupercoach`,
           visual_plan: `Screen recording of Neeko rankings table, zoomed to show top 10 clearly.\nCursor hovers and highlights ${p3.player_name}'s row.\nSlow scroll down the table pausing on key stats.\nOverlay text top-left: "LIVE RANKINGS DATA — NEEKO SPORTS".\nEnd card: Neeko logo + "Try it free — link in bio" on dark background.\nStyle: Clean minimal, green accents on key stats, let the data sell itself.`,
-          caption: `This is what Neeko's live rankings look like. ${p3.player_name} at #${p3.rank} — the algorithm doesn't miss. Get full access at Neeko Sports. #AFLFantasy #DataDriven #NeekoSports #AFLSupercoach`,
         },
       ],
     });
@@ -287,6 +359,7 @@ Deno.serve(async (req: Request) => {
 
     const body = await req.json().catch(() => ({}));
     const forceRegenerate = body?.force === true;
+    const focusPlayerName: string | undefined = body?.player_name ?? undefined;
     const weekKey = getWeekKey();
 
     if (!forceRegenerate) {
@@ -323,16 +396,16 @@ Deno.serve(async (req: Request) => {
     console.log(`Fetched ${players.length} players`);
 
     const mappedPlayers: PlayerData[] = players.map((p: Record<string, unknown>, i: number) => ({
-      player_id:    Number(p.player_id ?? 0),
-      player_name:  String(p.player_name ?? "Unknown"),
-      team:         String(p.team ?? "Unknown"),
-      projection:   Number(p.projection_final ?? 0),
-      ceiling:      Number(p.ceiling ?? 0),
-      price:        Number(p.price ?? 0),
-      value_score:  Number(p.value_score ?? 0),
-      rank:         i + 1,
-      form_score:   Number(p.form_score ?? 0),
-      consistency:  Number(p.consistency ?? 0),
+      player_id:     Number(p.player_id ?? 0),
+      player_name:   String(p.player_name ?? "Unknown"),
+      team:          String(p.team ?? "Unknown"),
+      projection:    Number(p.projection_final ?? 0),
+      ceiling:       Number(p.ceiling ?? 0),
+      price:         Number(p.price ?? 0),
+      value_score:   Number(p.value_score ?? 0),
+      rank:          i + 1,
+      form_score:    Number(p.form_score ?? 0),
+      consistency:   Number(p.consistency ?? 0),
       captain_score: Number(p.captain_score ?? 0),
     }));
 
@@ -345,8 +418,11 @@ Deno.serve(async (req: Request) => {
     if (hasOpenAI) {
       try {
         console.log("Calling OpenAI...");
-        planData = await callOpenAI(buildSystemPrompt(), buildUserPrompt(mappedPlayers, selections));
-        console.log("OpenAI response received");
+        planData = await callOpenAI(
+          buildSystemPrompt(),
+          buildUserPrompt(mappedPlayers, selections, focusPlayerName),
+        );
+        console.log("OpenAI response received and normalised");
       } catch (aiError) {
         console.warn("OpenAI failed, using fallback:", String(aiError));
         planData = buildFallbackPlan(mappedPlayers, selections);

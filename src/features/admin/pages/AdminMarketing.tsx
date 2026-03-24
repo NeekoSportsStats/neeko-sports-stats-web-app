@@ -1,11 +1,10 @@
 import { lazy, Suspense, useState } from "react";
-import { RefreshCw, Zap, MessageSquare, Calendar } from "lucide-react";
+import { RefreshCw, Zap, MessageSquare } from "lucide-react";
 
 const AdminContentEngine = lazy(() => import("@/features/admin/marketing/AdminContentEngine"));
 const RedditEngine       = lazy(() => import("@/features/admin/marketing/RedditEngine"));
-const WeeklyPlanner      = lazy(() => import("@/features/admin/marketing/WeeklyPlanner"));
 
-type Tab = "engine" | "reddit" | "planner";
+type Tab = "engine" | "reddit";
 
 const TABS: { id: Tab; label: string; icon: React.ElementType; description: string }[] = [
   {
@@ -19,12 +18,6 @@ const TABS: { id: Tab; label: string; icon: React.ElementType; description: stri
     label: "Reddit",
     icon: MessageSquare,
     description: "Generate posts and replies for Reddit engagement",
-  },
-  {
-    id: "planner",
-    label: "Planner",
-    icon: Calendar,
-    description: "Plan and schedule daily posts across platforms",
   },
 ];
 
@@ -66,9 +59,8 @@ export default function AdminMarketing() {
       <p className="text-xs text-muted-foreground mb-6 px-1">{activeTab.description}</p>
 
       <Suspense fallback={<TabFallback />}>
-        {tab === "engine"  && <AdminContentEngine />}
-        {tab === "reddit"  && <RedditEngine />}
-        {tab === "planner" && <WeeklyPlanner />}
+        {tab === "engine" && <AdminContentEngine />}
+        {tab === "reddit" && <RedditEngine />}
       </Suspense>
     </div>
   );
