@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { RefreshCw, Calendar, Video, Image, Monitor, Copy, Check, ChevronDown, ChevronUp, Zap, TriangleAlert as AlertTriangle, Star, TrendingUp, FileText, Eye, Play, Mic, ChevronRight, Brain, Flame, Target, Smartphone, ChartBar as BarChart2, List, GitCompare, BookOpen, Megaphone, Layers, UserRoundCog, Lightbulb } from "lucide-react";
+import { RefreshCw, Calendar, Video, Image, Monitor, Copy, Check, ChevronDown, ChevronUp, Zap, TriangleAlert as AlertTriangle, Star, TrendingUp, FileText, Eye, Play, Mic, ChevronRight, Brain, Flame, Target, Smartphone, ChartBar as BarChart2, List, GitCompare, BookOpen, Megaphone, Layers, UserRoundCog, Lightbulb, Lock, Clock as Unlock, Copy as CopyIcon, MessageCircle, Trophy, Swords, Users, Ambulance } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { useToast } from "@/hooks/use-toast";
 
@@ -16,7 +16,7 @@ type PostType =
   | "Narrative Post"
   | "Callout Post"
   | "Educational Breakdown";
-type PostCategory = "Value" | "Breakout" | "Trap" | "Captain" | "Proof";
+type PostCategory = "Value" | "Breakout" | "Trap" | "Captain" | "Proof" | "H2H" | "Top3" | "Injury" | "Conversation";
 type PostTab = "voice" | "hooks" | "visual" | "caption" | "ai" | "platform" | "strategy";
 type Platform = "tiktok" | "instagram" | "reddit";
 
@@ -44,6 +44,10 @@ interface PostPlan {
   caption_script: string;
   caption?: string;
   visual_plan: string;
+  locked?: boolean;
+  player2_name?: string;
+  player2_id?: number;
+  player2_team?: string;
 }
 
 interface DayPlan {
@@ -86,11 +90,15 @@ interface TodayTopPost {
 // ── CONSTANTS ─────────────────────────────────────────────────────────────────
 
 const CATEGORY_META: Record<PostCategory, { color: string; bg: string; border: string; icon: React.ElementType }> = {
-  Value:    { color: "text-emerald-700 dark:text-emerald-300", bg: "bg-emerald-500/10", border: "border-emerald-500/30", icon: TrendingUp },
-  Breakout: { color: "text-orange-700 dark:text-orange-300",  bg: "bg-orange-500/10",  border: "border-orange-500/30",  icon: Zap },
-  Trap:     { color: "text-red-700 dark:text-red-300",        bg: "bg-red-500/10",     border: "border-red-500/30",     icon: AlertTriangle },
-  Captain:  { color: "text-blue-700 dark:text-blue-300",      bg: "bg-blue-500/10",    border: "border-blue-500/30",    icon: Star },
-  Proof:    { color: "text-slate-700 dark:text-slate-300",    bg: "bg-slate-500/10",   border: "border-slate-500/30",   icon: Eye },
+  Value:        { color: "text-emerald-700 dark:text-emerald-300", bg: "bg-emerald-500/10",  border: "border-emerald-500/30",  icon: TrendingUp },
+  Breakout:     { color: "text-orange-700 dark:text-orange-300",  bg: "bg-orange-500/10",   border: "border-orange-500/30",   icon: Zap },
+  Trap:         { color: "text-red-700 dark:text-red-300",        bg: "bg-red-500/10",      border: "border-red-500/30",      icon: AlertTriangle },
+  Captain:      { color: "text-blue-700 dark:text-blue-300",      bg: "bg-blue-500/10",     border: "border-blue-500/30",     icon: Star },
+  Proof:        { color: "text-slate-700 dark:text-slate-300",    bg: "bg-slate-500/10",    border: "border-slate-500/30",    icon: Eye },
+  H2H:          { color: "text-cyan-700 dark:text-cyan-300",      bg: "bg-cyan-500/10",     border: "border-cyan-500/30",     icon: Swords },
+  Top3:         { color: "text-yellow-700 dark:text-yellow-300",  bg: "bg-yellow-500/10",   border: "border-yellow-500/30",   icon: Trophy },
+  Injury:       { color: "text-pink-700 dark:text-pink-300",      bg: "bg-pink-500/10",     border: "border-pink-500/30",     icon: Ambulance },
+  Conversation: { color: "text-violet-700 dark:text-violet-300",  bg: "bg-violet-500/10",   border: "border-violet-500/30",   icon: MessageCircle },
 };
 
 const POST_TYPE_ICON: Record<PostType, React.ElementType> = {
@@ -120,6 +128,17 @@ const ANGLE_LABELS: Record<string, { label: string; color: string }> = {
   breakdown:           { label: "Breakdown",           color: "text-blue-500 dark:text-blue-400" },
   narrative:           { label: "Narrative",           color: "text-slate-500 dark:text-slate-400" },
   proof:               { label: "Proof",               color: "text-slate-700 dark:text-slate-300" },
+  h2h:                 { label: "Head-to-Head",        color: "text-cyan-600 dark:text-cyan-400" },
+  top3_friday:         { label: "Top 3 Friday",        color: "text-yellow-600 dark:text-yellow-400" },
+  top3_saturday:       { label: "Top 3 Saturday",      color: "text-yellow-600 dark:text-yellow-400" },
+  top3_sunday:         { label: "Top 3 Sunday",        color: "text-yellow-600 dark:text-yellow-400" },
+  top3_mid:            { label: "Top 3 MID",           color: "text-yellow-700 dark:text-yellow-300" },
+  top3_ruck:           { label: "Top 3 RUCK",          color: "text-yellow-700 dark:text-yellow-300" },
+  top3_value:          { label: "Top 3 Value",         color: "text-yellow-700 dark:text-yellow-300" },
+  injury_replacement:  { label: "Injury Replacement",  color: "text-pink-600 dark:text-pink-400" },
+  conversation:        { label: "Conversation",        color: "text-violet-600 dark:text-violet-400" },
+  we_called_it:        { label: "We Called It",        color: "text-slate-600 dark:text-slate-400" },
+  system_works:        { label: "System Works",        color: "text-slate-700 dark:text-slate-300" },
 };
 
 const POST_TABS: { id: PostTab; label: string; icon: React.ElementType }[] = [
@@ -271,6 +290,34 @@ function getPostStrategy(category: PostCategory, postType: PostType): PostStrate
       expectedBehaviour: "Follow + save the post as a benchmark of Neeko's accuracy",
       bestTime: "Saturday–Sunday (post-match results)",
       callToAction: "See more Neeko AI predictions — follow for weekly breakdowns",
+    },
+    H2H: {
+      goal: "Drive engagement with a head-to-head debate that forces the viewer to pick a side",
+      trigger: "User has one of the players and is deciding whether to trade",
+      expectedBehaviour: "Comment their pick — high engagement, shares to group chats",
+      bestTime: "Tuesday–Wednesday (debate week, pre-trade)",
+      callToAction: "Drop your pick in the comments — see the full data at Neeko",
+    },
+    Top3: {
+      goal: "Position Neeko as the definitive weekly rankings source",
+      trigger: "User is setting their team and wants the top picks validated",
+      expectedBehaviour: "Save the post for round day or share to their league",
+      bestTime: "Friday–Saturday (game day build-up)",
+      callToAction: "See the full Top 10 rankings — link in bio",
+    },
+    Injury: {
+      goal: "Be first with a replacement plan when a key player goes down",
+      trigger: "User has the injured player and needs an immediate alternative",
+      expectedBehaviour: "Comment 'already traded' or 'going with option 2'",
+      bestTime: "Immediately on injury news (Monday–Tuesday)",
+      callToAction: "Full availability + replacement list at Neeko — link in bio",
+    },
+    Conversation: {
+      goal: "Grow community engagement by starting a debate or poll",
+      trigger: "User has a strong opinion and wants to share it",
+      expectedBehaviour: "Comment their answer, tag a friend with a different view",
+      bestTime: "Any day — conversation posts work throughout the week",
+      callToAction: "Drop your take in the comments — follow for weekly debates",
     },
   };
 
@@ -1232,6 +1279,8 @@ function PostDetailPanel({
   onSuggestBetter,
   suggestingPost,
   suggestedPlayers,
+  onToggleLock,
+  onDuplicate,
 }: {
   post: PostPlan;
   onRegenerate: (post: PostPlan) => void;
@@ -1245,6 +1294,8 @@ function PostDetailPanel({
   onSuggestBetter: (post: PostPlan) => void;
   suggestingPost: string | null;
   suggestedPlayers: Record<string, PlayerOption>;
+  onToggleLock: (post: PostPlan) => void;
+  onDuplicate: (post: PostPlan) => void;
 }) {
   const [activeTab, setActiveTab] = useState<PostTab>("voice");
   const { copied, copy } = useCopy();
@@ -1296,7 +1347,7 @@ function PostDetailPanel({
           <span className="text-sm font-semibold">{post.player_name}</span>
           <span className="text-xs text-muted-foreground">{post.team}</span>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <button
             onClick={copyAll}
             className="flex items-center gap-1.5 px-2.5 py-1.5 bg-foreground text-background text-xs rounded-md hover:opacity-90 transition-opacity"
@@ -1304,9 +1355,29 @@ function PostDetailPanel({
             {copied === "all" ? <><Check className="h-3.5 w-3.5" /> Copied!</> : <><Copy className="h-3.5 w-3.5" /> Copy All</>}
           </button>
           <button
+            onClick={() => onDuplicate(post)}
+            title="Duplicate this post"
+            className="flex items-center gap-1.5 px-2.5 py-1.5 border border-border text-xs rounded-md hover:bg-accent transition-colors"
+          >
+            <CopyIcon className="h-3.5 w-3.5" />
+            Duplicate
+          </button>
+          <button
+            onClick={() => onToggleLock(post)}
+            title={post.locked ? "Unlock this post — allow regeneration" : "Lock this post — prevent overwrite"}
+            className={`flex items-center gap-1.5 px-2.5 py-1.5 border text-xs rounded-md transition-colors ${
+              post.locked
+                ? "border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-300 hover:bg-amber-500/20"
+                : "border-border text-muted-foreground hover:bg-accent"
+            }`}
+          >
+            {post.locked ? <Lock className="h-3.5 w-3.5" /> : <Unlock className="h-3.5 w-3.5" />}
+            {post.locked ? "Locked" : "Lock"}
+          </button>
+          <button
             onClick={() => onAggressiveRewrite(post)}
-            disabled={rewriting || regenerating || rewriteCount >= 2}
-            title={rewriteCount >= 2 ? "Max 2 rewrites reached" : "Rewrite hooks, script & caption to be more aggressive"}
+            disabled={rewriting || regenerating || rewriteCount >= 2 || post.locked}
+            title={post.locked ? "Post is locked" : rewriteCount >= 2 ? "Max 2 rewrites reached" : "Rewrite hooks, script & caption to be more aggressive"}
             className="flex items-center gap-1.5 px-2.5 py-1.5 border border-orange-500/40 text-orange-600 dark:text-orange-400 text-xs rounded-md hover:bg-orange-500/10 transition-colors disabled:opacity-40"
           >
             <Flame className={`h-3.5 w-3.5 ${rewriting ? "animate-pulse" : ""}`} />
@@ -1314,7 +1385,8 @@ function PostDetailPanel({
           </button>
           <button
             onClick={() => onRegenerate(post)}
-            disabled={regenerating || rewriting}
+            disabled={regenerating || rewriting || post.locked}
+            title={post.locked ? "Post is locked — unlock to regenerate" : "Regenerate this post"}
             className="flex items-center gap-1.5 px-2.5 py-1.5 border border-border text-xs rounded-md hover:bg-accent transition-colors disabled:opacity-50"
           >
             <RefreshCw className={`h-3.5 w-3.5 ${regenerating ? "animate-spin" : ""}`} />
@@ -1455,6 +1527,12 @@ function PostCard({
             {topHookScore}/10
           </span>
         )}
+        {post.locked && (
+          <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold px-1 py-0.5 rounded bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-500/30">
+            <Lock className="h-2.5 w-2.5" />
+            Locked
+          </span>
+        )}
       </div>
       <p className="font-semibold text-sm leading-tight truncate">{post.player_name}</p>
       <p className="text-xs text-muted-foreground truncate mb-1.5">{post.team}</p>
@@ -1490,6 +1568,8 @@ function DayRow({
   onSuggestBetter,
   suggestingPost,
   suggestedPlayers,
+  onToggleLock,
+  onDuplicate,
 }: {
   dayPlan: DayPlan;
   selectedPost: PostPlan | null;
@@ -1505,6 +1585,8 @@ function DayRow({
   onSuggestBetter: (post: PostPlan) => void;
   suggestingPost: string | null;
   suggestedPlayers: Record<string, PlayerOption>;
+  onToggleLock: (post: PostPlan) => void;
+  onDuplicate: (post: PostPlan) => void;
 }) {
   const [expanded, setExpanded] = useState(dayPlan.day === 1);
   const dayLabel = DAY_LABELS[(dayPlan.day - 1) % 7];
@@ -1568,6 +1650,8 @@ function DayRow({
               onSuggestBetter={onSuggestBetter}
               suggestingPost={suggestingPost}
               suggestedPlayers={suggestedPlayers}
+              onToggleLock={onToggleLock}
+              onDuplicate={onDuplicate}
             />
           )}
         </div>
@@ -1642,6 +1726,48 @@ export default function AdminContentEngine() {
   const [suggestingPost, setSuggestingPost] = useState<string | null>(null);
   const [suggestedPlayers, setSuggestedPlayers] = useState<Record<string, PlayerOption>>({});
   const { toast } = useToast();
+
+  const updatePostInPlan = (updatedPost: PostPlan) => {
+    setPlan((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        days: prev.days.map((d) =>
+          d.day !== updatedPost.day ? d : {
+            ...d,
+            posts: d.posts.map((p) => p.post_number !== updatedPost.post_number ? p : updatedPost),
+          }
+        ),
+      };
+    });
+  };
+
+  const handleToggleLock = (post: PostPlan) => {
+    const newLocked = !post.locked;
+    const updatedPost: PostPlan = { ...post, locked: newLocked };
+    updatePostInPlan(updatedPost);
+    if (selectedPost?.day === post.day && selectedPost?.post_number === post.post_number) {
+      setSelectedPost(updatedPost);
+    }
+    toast({ title: newLocked ? `Post locked — ${post.player_name}` : `Post unlocked — ${post.player_name}` });
+  };
+
+  const handleDuplicate = (post: PostPlan) => {
+    setPlan((prev) => {
+      if (!prev) return prev;
+      const dayPlan = prev.days.find((d) => d.day === post.day);
+      if (!dayPlan) return prev;
+      const maxPostNumber = Math.max(...dayPlan.posts.map((p) => p.post_number));
+      const duplicate: PostPlan = { ...post, post_number: maxPostNumber + 1, locked: false };
+      return {
+        ...prev,
+        days: prev.days.map((d) =>
+          d.day !== post.day ? d : { ...d, posts: [...d.posts, duplicate] }
+        ),
+      };
+    });
+    toast({ title: `Duplicated — ${post.player_name}`, description: "New post added to the same day." });
+  };
 
   useEffect(() => {
     supabase
@@ -1725,6 +1851,10 @@ export default function AdminContentEngine() {
   };
 
   const handleRegeneratePost = async (post: PostPlan) => {
+    if (post.locked) {
+      toast({ title: "Post is locked", description: "Unlock this post before regenerating.", variant: "destructive" });
+      return;
+    }
     const key = `${post.day}-${post.post_number}`;
     setRegeneratingPost(key);
     try {
@@ -1786,6 +1916,10 @@ export default function AdminContentEngine() {
   };
 
   const handleAggressiveRewrite = async (post: PostPlan) => {
+    if (post.locked) {
+      toast({ title: "Post is locked", description: "Unlock this post before rewriting.", variant: "destructive" });
+      return;
+    }
     const key = `${post.day}-${post.post_number}`;
     const count = rewriteCounts[key] ?? 0;
     if (count >= 2) {
@@ -1885,6 +2019,10 @@ ${originalContent}`;
   };
 
   const handleSwapPlayer = async (post: PostPlan, newPlayerId: number) => {
+    if (post.locked) {
+      toast({ title: "Post is locked", description: "Unlock this post before swapping the player.", variant: "destructive" });
+      return;
+    }
     const key = `${post.day}-${post.post_number}`;
     const newPlayer = availablePlayers.find((p) => p.player_id === newPlayerId);
     if (!newPlayer) return;
@@ -2097,6 +2235,8 @@ OUTPUT (JSON only, no markdown):
               onSuggestBetter={handleSuggestBetter}
               suggestingPost={suggestingPost}
               suggestedPlayers={suggestedPlayers}
+              onToggleLock={handleToggleLock}
+              onDuplicate={handleDuplicate}
             />
           ))}
         </div>
