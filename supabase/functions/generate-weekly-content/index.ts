@@ -11,15 +11,53 @@ interface PlayerData {
   player_id: number;
   player_name: string;
   team: string;
+  position: string;
   projection: number;
   ceiling: number;
+  floor: number;
   price: number;
+  prev_price: number;
+  price_change: number;
   value_score: number;
+  best_value_score: number;
   rank: number;
   form_score: number;
   consistency: number;
   captain_score: number;
+  risk_rating: number;
+  upside_pct: number;
+  matchup_label: string;
+  signal: string;
+  ai_recommendation: string;
+  recommendation_short: string;
+  market_watch_category: string;
+  games_played: number;
 }
+
+type ContentType =
+  | "Short-form Video"
+  | "Graphic Post"
+  | "Screen Recording"
+  | "Hybrid Video"
+  | "Comparison Post"
+  | "Narrative Post"
+  | "Callout Post"
+  | "Educational Breakdown";
+
+type ContentAngle =
+  | "hidden_edge"
+  | "market_inefficiency"
+  | "must_have"
+  | "captain_lock"
+  | "trap_warning"
+  | "overpriced"
+  | "risk_reward"
+  | "contrarian"
+  | "comparison"
+  | "youre_wrong"
+  | "breakdown"
+  | "narrative"
+  | "proof";
 
 function getWeekKey(): string {
   const now = new Date();
@@ -31,6 +69,18 @@ function getWeekKey(): string {
   return `${year}-W${String(week).padStart(2, "0")}`;
 }
 
+function deriveAngle(p: PlayerData): ContentAngle {
+  if (p.value_score >= 8 && p.projection >= 100) return "hidden_edge";
+  if (p.value_score >= 7 && p.price_change < 0) return "market_inefficiency";
+  if (p.captain_score >= 80 && p.projection >= 110) return "must_have";
+  if (p.captain_score >= 75 && p.consistency >= 70) return "captain_lock";
+  if (p.value_score <= 3 && p.rank <= 25) return "overpriced";
+  if (p.value_score <= 4 && p.rank <= 30) return "trap_warning";
+  if (p.risk_rating >= 7 && p.ceiling >= 120) return "risk_reward";
+  if (p.consistency <= 40 && p.projection >= 95) return "risk_reward";
+  return "hidden_edge";
+}
+
 function selectPlayers(players: PlayerData[]) {
   const sorted = [...players].sort((a, b) => a.rank - b.rank);
   const top50 = sorted.slice(0, 50);
@@ -40,74 +90,130 @@ function selectPlayers(players: PlayerData[]) {
     .slice(0, 14);
 
   const breakoutPlayers = [...top50]
-    .sort((a, b) => b.form_score - a.form_score)
-    .slice(0, 14);
+    .filter(p => p.upside_pct >= 10 || p.form_score >= 60)
+    .sort((a, b) => b.upside_pct - a.upside_pct)
+    .slice(0, 12);
 
   const trapPlayers = top50
-    .filter((p) => p.rank <= 20 && p.value_score < 5)
-    .slice(0, 7);
+    .filter(p => p.value_score < 5 && p.rank <= 30)
+    .slice(0, 8);
 
   const captainPlayers = [...top50]
     .sort((a, b) => b.captain_score - a.captain_score)
-    .slice(0, 7);
+    .slice(0, 8);
 
   const proofPlayers = sorted.slice(0, 10);
 
-  return { valuePlayers, breakoutPlayers, trapPlayers, captainPlayers, proofPlayers };
+  const comparisonPairs: [PlayerData, PlayerData][] = [];
+  for (let i = 0; i < Math.min(6, valuePlayers.length - 1); i++) {
+    if (valuePlayers[i] && valuePlayers[i + 1]) {
+      comparisonPairs.push([valuePlayers[i], valuePlayers[i + 1]]);
+    }
+  }
+
+  return { valuePlayers, breakoutPlayers, trapPlayers, captainPlayers, proofPlayers, comparisonPairs };
 }
 
 function fmtPlayer(p: PlayerData, rank: number): string {
-  return `${p.player_name} (${p.team}) — Rank #${rank}, Proj: ${Math.round(p.projection)}pts, Ceil: ${Math.round(p.ceiling)}pts, Price: $${Math.round(p.price / 1000)}k, Value: ${p.value_score.toFixed(1)}, Form: ${Math.round(p.form_score)}, Cap: ${Math.round(p.captain_score)}`;
+  const priceStr = `$${Math.round(p.price / 1000)}k`;
+  const priceChange = p.price_change !== 0
+    ? ` (${p.price_change > 0 ? "+" : ""}$${Math.round(p.price_change / 1000)}k this week)`
+    : "";
+  const matchup = p.matchup_label ? ` | Matchup: ${p.matchup_label}` : "";
+  const signal = p.signal ? ` | Signal: ${p.signal}` : "";
+  const mwCat = p.market_watch_category ? ` | MW: ${p.market_watch_category}` : "";
+  const recShort = p.recommendation_short ? ` | AI: "${p.recommendation_short}"` : "";
+  return `${p.player_name} (${p.team}, ${p.position}) — Rank #${rank} | Proj: ${Math.round(p.projection)}pts | Ceil: ${Math.round(p.ceiling)}pts | Floor: ${Math.round(p.floor)}pts | Price: ${priceStr}${priceChange} | Value: ${p.value_score.toFixed(1)} | BestVal: ${p.best_value_score?.toFixed(1) ?? "n/a"} | Form: ${Math.round(p.form_score)} | Consistency: ${Math.round(p.consistency)}% | Risk: ${p.risk_rating?.toFixed(1) ?? "n/a"} | Upside: ${p.upside_pct?.toFixed(1) ?? "n/a"}%${matchup}${signal}${mwCat}${recShort} | Games: ${p.games_played}`;
 }
 
 function buildSystemPrompt(): string {
-  return `You are an elite AFL Fantasy strategist, performance marketer, and content creator for Neeko Sports. You do NOT create generic content. Every post must stop scroll, challenge the audience, create urgency, and make the user feel they are missing out if they don't follow Neeko.
+  return `You are an elite AFL Fantasy strategist, performance marketer, and creative director for Neeko Sports. You produce PREMIUM content — not templates, not patterns, not filler.
 
-CONTENT PHILOSOPHY:
-- Every post must have a STRONG OPINION. No neutral takes. Take a side.
+CORE PHILOSOPHY:
+- Every post must have a UNIQUE ANGLE derived directly from that player's specific data story.
 - Every post must feel like INSIDER KNOWLEDGE the audience doesn't have yet.
-- Every post must create either URGENCY ("act now"), FEAR OF MISSING OUT, or CONTROVERSY ("everyone else is wrong").
-- Proof posts establish credibility. Opinion posts drive engagement. Value posts drive subscriptions.
+- Every post creates URGENCY, FEAR OF MISSING OUT, or CONTROVERSY.
+- Content type must match the story — not follow a fixed rotation.
+- No two posts in the week should feel structurally identical.
 
-THINK BEFORE YOU WRITE (apply to every post):
-1. What is the mainstream AFL Fantasy opinion on this player?
-2. Where is the DATA creating an edge the crowd hasn't found?
-3. What would make someone feel behind if they didn't see this post?
-4. What one-line contrarian take would make someone stop scrolling?
+CONTENT TYPES AVAILABLE (choose the right one for the story):
+- "Short-form Video" — face/voiceover, 15-30s, opinion-led, one strong take
+- "Graphic Post" — static image, bold visual, 1-3 data points, strong headline
+- "Screen Recording" — live Neeko UI walkthrough, proof-driven, credibility builder
+- "Hybrid Video" — screen recording + talking head overlay, data + personality
+- "Comparison Post" — player A vs player B, data table visual, clear winner verdict
+- "Narrative Post" — storytelling arc, "here's how this happened" format
+- "Callout Post" — directly challenges a mainstream opinion, controversy-first
+- "Educational Breakdown" — explains a concept (value score, captain logic), builds authority
+
+CONTENT TYPE SELECTION RULES:
+- High value player with price anomaly → "Graphic Post" or "Short-form Video"
+- Trap / overpriced → "Callout Post" or "Graphic Post"
+- Two players with conflicting signals → "Comparison Post"
+- Strong price rise story → "Narrative Post"
+- Showing Neeko accuracy / live data → "Screen Recording" or "Hybrid Video"
+- Teaching value scoring / analytics → "Educational Breakdown"
+- Captain with strong data → "Short-form Video" or "Graphic Post"
+- DO NOT use "Screen Recording" more than 2x per week.
+
+ANGLE RULES — assign one per post, make it the spine of every creative decision:
+- hidden_edge: player flying under radar, value before the market wakes up
+- market_inefficiency: price hasn't caught up to performance — act now
+- must_have: elite output, no debate, bring them in
+- captain_lock: high floor + high ceiling = captain decision made
+- trap_warning: popular player, poor value, dangerous trap
+- overpriced: rank looks good but value gap is real
+- risk_reward: boom-or-bust, high ceiling but volatile
+- contrarian: mainstream AFL Fantasy opinion is wrong
+- comparison: data picks a clear winner between two options
+- youre_wrong: directly challenges a decision most coaches are making
+- breakdown: education-first, explain the edge in plain terms
+- narrative: story-driven, how the data unfolded over weeks
+- proof: credibility through past accuracy
 
 HOOK RULES — NON-NEGOTIABLE:
-- Every hook must be emotionally triggering, slightly aggressive, or sharply contrarian.
-- FORBIDDEN hooks: "Here's why...", "Did you know...", "This player is...", "Check out...", passive informational openers.
-- REQUIRED: tension, challenge, a mistake being called out, or urgency.
-- Hook types to rotate: Controversy ("Everyone's wrong about X"), Fear ("You're about to make a $500k mistake"), Data-first ("97 pts. $432k. Still sleeping?"), Contrarian ("Stop listening to the experts"), Challenge ("Prove me wrong — bring in X"), Identity ("Real coaches already know this").
+- FORBIDDEN: "Here's why...", "Did you know...", "This player is...", "Check out..."
+- REQUIRED: tension, a belief being challenged, a mistake being called out, or specific numbers.
+- Hook types to rotate across the week: Controversy, Fear, Data-first, Contrarian, Challenge, Identity, Narrative.
+- NEVER repeat the same hook structure on two consecutive days.
+- Each hook must be under 20 words and could stand alone as a social post.
 
 VOICE SCRIPT RULES:
-- 20-30 seconds spoken aloud at natural pace (~55-80 words).
-- Structure: Hook (tension) → Setup (what everyone thinks) → Data pivot (what the numbers say) → Strong take (your call) → CTA (Neeko Sports — link in bio).
+- 55-80 words. Structure: Hook (tension) → Setup (what everyone thinks) → Data pivot (specific numbers) → Strong take (your call) → CTA (Neeko Sports — link in bio).
 - Use "..." for natural pauses. Use "—" for hard emphasis breaks.
-- Sound like a sharp analyst who has already made the decision — not someone exploring options.
-- No hedging: NEVER use "might", "could", "perhaps", "possibly", "worth watching".
+- Sound like a sharp analyst who has ALREADY made the decision.
+- NEVER use: "might", "could", "perhaps", "possibly", "worth watching", "interesting".
+- Reference SPECIFIC numbers from the player data provided.
 
 CAPTION RULES:
-- 2-4 punchy lines. Strong opinion. Slight controversy or urgency.
-- Line 1: The take (bold opinion).
-- Line 2-3: 1-2 specific data points that back it up.
-- Line 4: CTA + 3-4 hashtags (#AFLFantasy #SuperCoach #NeekoSports + one specific).
-- No fluff, no "great player", no "solid option".
+- 3-4 punchy lines. Line 1: Bold opinion. Lines 2-3: Two specific data points. Final line: CTA + 3-4 hashtags.
+- No fluff. No generic phrasing.
 
-VISUAL PLAN RULES:
-- Professional creative brief format. Scene-by-scene (Scene 1, Scene 2, etc.) with exact timing.
-- Specify: exact text overlays (word-for-word), stat cards to show, colour scheme (green for buy/value/breakout/captain, red/amber for trap/sell), animation style (pop-in, zoom, flash, shake).
-- Must be a single STRING — never an object.
+VISUAL PLAN RULES — THIS IS THE MOST IMPORTANT FIELD:
+- Must be a PRODUCTION BRIEF, not a vague description.
+- For Video / Short-form Video / Hybrid Video: Scene-by-scene breakdown. Each scene: timing (e.g. "0-3s"), background, exact text overlay word-for-word, animation style (zoom, fade, slide, shake, pop, flash), colour logic.
+- For Graphic Post / Callout Post: Layout brief. Specify: top/middle/bottom zones, exact headline text, exact subtext, player image placement, background, colour scheme, font style.
+- For Screen Recording: Step-by-step flow. Specify: exactly which page to open, where to scroll, what to highlight, cursor speed, pause timing, zoom points.
+- For Comparison Post: Table layout spec. Two columns, stat rows to include, which column wins each stat (green/red), final verdict overlay.
+- For Educational Breakdown: Slide-by-slide or section-by-section. What concept is taught, what data is shown on each slide.
+- Colour logic: GREEN (#00C853) = value/breakout/buy/captain. RED (#D32F2F) = trap/sell/avoid. AMBER (#FF8F00) = risk/neutral. WHITE on BLACK for authority.
+- Must be a single STRING. Detailed enough that a designer could execute it without asking questions.
 
-CONTENT MIX — rotate across the 7-day plan:
-- Value Lock: "Buy this player NOW before the price rises"
-- Trap Alert: "Everyone is bringing X in — here's why that's a mistake"
-- Breakout: "X is about to explode — here's what the data shows"
-- Contrarian: "The crowd is wrong. Here's why."
-- Comparison: "X vs Y — the data picks a clear winner"
-- You're Wrong: "Stop doing this. It's costing you rankings."
-- Proof: Screen recording showing Neeko's prediction accuracy
+UNIQUENESS ENFORCER:
+- Across the 7-day plan: rotate hook types, tone (aggressive / analytical / storytelling / educational), visual format, and content type.
+- Maximum 2 posts of the same content type per week.
+- Maximum 2 posts with the same angle category per week.
+- Proof posts: include 2-3 across the week, NOT on consecutive days, NOT forced as post 3 every day.
+- Each player used maximum ONCE across the entire week.
+
+WEEKLY VARIATION GUIDE (must rotate through, not in fixed order):
+Day 1: Value/edge angle — aggressive data-first
+Day 2: Trap/callout — controversy-first
+Day 3: Breakout/narrative — story-driven
+Day 4: Comparison — data table format
+Day 5: Captain/education — authority-building
+Day 6: Proof — credibility through accuracy
+Day 7: Contrarian/risk — challenge the mainstream take
 
 OUTPUT: Valid JSON only. No markdown code fences. No extra text before or after the JSON.`;
 }
@@ -117,66 +223,69 @@ function buildUserPrompt(
   sel: ReturnType<typeof selectPlayers>,
   focusPlayerName?: string,
 ): string {
-  const { valuePlayers, breakoutPlayers, trapPlayers, captainPlayers, proofPlayers } = sel;
+  const { valuePlayers, breakoutPlayers, trapPlayers, captainPlayers, proofPlayers, comparisonPairs } = sel;
 
   const trapList = trapPlayers.length > 0
     ? trapPlayers.map((p) => fmtPlayer(p, p.rank)).join("\n")
-    : "Pick top-ranked players with value_score below 5 from the value list";
+    : "Select top-ranked players with value_score below 5 from the pool above";
 
   const focusNote = focusPlayerName
-    ? `\n\nFOCUS PLAYER: Prioritise "${focusPlayerName}" in the content where appropriate.\n`
+    ? `\n\nFOCUS PLAYER: Prioritise "${focusPlayerName}" — build at least one post directly around their data story.\n`
     : "";
+
+  const compList = comparisonPairs.length > 0
+    ? comparisonPairs.slice(0, 3).map((pair, i) =>
+        `Pair ${i + 1}: ${pair[0].player_name} vs ${pair[1].player_name}`
+      ).join("\n")
+    : "Choose two value players with contrasting signals";
 
   return `Generate a FULL 7-DAY AFL Fantasy content plan (21 posts total: 3 per day).
 ${focusNote}
-PLAYER POOL (use ONLY these players — no invented names):
+PLAYER POOL — use ONLY these players, no invented names:
 
-VALUE CANDIDATES (underpriced relative to output — lead with the price gap):
+VALUE / EDGE PLAYERS (underpriced relative to output):
 ${valuePlayers.map((p, i) => fmtPlayer(p, i + 1)).join("\n")}
 
-BREAKOUT/FORM CANDIDATES (high form, high upside — lead with the ceiling):
-${breakoutPlayers.slice(0, 7).map((p, i) => fmtPlayer(p, i + 1)).join("\n")}
+BREAKOUT / HIGH-UPSIDE PLAYERS:
+${breakoutPlayers.slice(0, 8).map((p, i) => fmtPlayer(p, i + 1)).join("\n")}
 
-TRAP CANDIDATES (popular picks but dangerous — lead with the warning):
+TRAP / OVERPRICED PLAYERS:
 ${trapList}
 
-CAPTAIN PICKS (elite score potential — lead with confidence and the projection):
+CAPTAIN PICKS (elite score potential):
 ${captainPlayers.map((p, i) => fmtPlayer(p, i + 1)).join("\n")}
 
-TOP PLAYERS FOR PROOF POSTS (showing Neeko's live rankings data):
+TOP PLAYERS FOR PROOF / SCREEN RECORDING:
 ${proofPlayers.map((p, i) => fmtPlayer(p, i + 1)).join("\n")}
 
----
-
-DAILY STRUCTURE (ALL 7 DAYS):
-Post 1 (Video): Rotate through — Value Lock / Breakout / Contrarian / Comparison / Captain
-Post 2 (Image or Video): Rotate through — Trap Alert / "You're Wrong" / Controversial Opinion
-Post 3 (Screen Recording): ALWAYS Proof — show Neeko live rankings data
-
-CONTENT MIX RULES:
-- Each player used maximum ONCE across the entire week
-- No duplicate players on the same day
-- Post 2 must be the spiciest, most scroll-stopping post of the day — challenge the mainstream view
-- Day 1 Post 1: Value Lock. Day 2 Post 1: Breakout. Day 3 Post 1: Contrarian. Day 4 Post 1: Value Lock. Day 5 Post 1: Breakout. Day 6 Post 1: Captain. Day 7 Post 1: Comparison.
-- Every voice script must follow: Hook → Setup → Data pivot → Strong take → Neeko CTA
-- Every hook must create tension, challenge a belief, or invoke urgency — NO passive informational hooks
+SUGGESTED COMPARISON PAIRS:
+${compList}
 
 ---
 
-FOR EACH POST, OUTPUT EXACTLY THESE FIELDS:
-- post_type: "Video", "Image", or "Screen Recording"
-- category: "Value", "Breakout", "Trap", "Captain", or "Proof"
-- player_name: string (must match player pool exactly)
-- player_id: number (must match player pool exactly)
-- team: string
-- hooks: array of exactly 3 strings — Hook 1: Controversy or "You're Wrong" style, Hook 2: Data-first with specific numbers, Hook 3: Challenge or Fear-of-missing-out. Each under 20 words. NO passive openers.
-- voice_script: 55-80 words. Spoken aloud = 20-30 seconds. Structure: tension hook → what everyone thinks → data pivot → strong call → Neeko CTA. Use "..." for pauses, "—" for emphasis.
-- caption_script: 2-4 lines. Line 1 is a strong opinion or bold claim. Lines 2-3 are specific data points. Final line: CTA + 3-4 hashtags. No fluff.
-- visual_plan: STRING (not object). Scene-by-scene creative brief. Include exact text overlays word-for-word, which stats to show, colour scheme (green for value/breakout/captain, red/amber for trap), animation notes. 4-6 sentences.
+REQUIREMENTS FOR THE 7-DAY PLAN:
+
+1. CONTENT TYPE: Choose dynamically per post — do NOT follow a fixed pattern. Use the full set:
+   "Short-form Video", "Graphic Post", "Screen Recording", "Hybrid Video", "Comparison Post", "Narrative Post", "Callout Post", "Educational Breakdown"
+   Max 2 of any one type across the full week.
+
+2. ANGLE: Assign one angle per post from:
+   hidden_edge, market_inefficiency, must_have, captain_lock, trap_warning, overpriced, risk_reward, contrarian, comparison, youre_wrong, breakdown, narrative, proof
+   Max 2 of any one angle across the full week.
+
+3. PROOF POSTS: Include 2-3 proof/screen-recording posts across the week. Spread them — NOT consecutive days.
+
+4. PLAYER DATA USAGE: Every script, hook, caption, and visual plan must reference SPECIFIC NUMBERS from the player data provided. No generic phrasing. The player's exact projection, price, value_score, ceiling, floor, consistency, form, matchup, price_change — use them.
+
+5. VISUAL PLANS: Full production brief for every post. Video = scene-by-scene with timing. Graphic = design layout brief. Screen recording = step-by-step flow. Comparison = table layout.
+
+6. HOOKS: 3 per post. Hook 1: most aggressive / controversy. Hook 2: data-first with specific numbers. Hook 3: fear of missing out or challenge. Each under 20 words.
+
+7. UNIQUENESS: No two posts in the week should use the same hook structure or visual format.
 
 ---
 
-OUTPUT (strict JSON, no markdown fences):
+OUTPUT (strict JSON, no markdown):
 {
   "week_key": "${getWeekKey()}",
   "days": [
@@ -186,22 +295,25 @@ OUTPUT (strict JSON, no markdown fences):
         {
           "day": 1,
           "post_number": 1,
-          "post_type": "Video",
+          "post_type": "Short-form Video",
           "category": "Value",
+          "content_angle": "hidden_edge",
           "player_name": "...",
           "player_id": 123,
           "team": "...",
           "hooks": ["...", "...", "..."],
           "voice_script": "...",
           "caption_script": "...",
-          "visual_plan": "Scene 1 (0-3s): ... Scene 2 (3-7s): ..."
+          "visual_plan": "Scene 1 (0-3s): [background, text, animation]. Scene 2 (3-8s): ..."
         }
       ]
     }
   ]
 }
 
-Generate ALL 7 days = 21 posts total. Every post must be COMPLETE — nothing left blank. Every hook must pass the quality filter: if it could be published by a generic sports account, rewrite it until it couldn't.`;
+Generate ALL 7 days = 21 posts. Every post must be COMPLETE — no blanks, no placeholders.
+Visual plans must be detailed enough for a designer to execute without asking a single question.
+Every hook must be so sharp it could not be published by a generic sports account.`;
 }
 
 function ensureString(val: unknown): string {
@@ -220,8 +332,9 @@ function normalisePost(raw: Record<string, unknown>, day: number, postNumber: nu
   return {
     day:            Number(raw.day ?? day),
     post_number:    Number(raw.post_number ?? postNumber),
-    post_type:      ensureString(raw.post_type || "Video"),
+    post_type:      ensureString(raw.post_type || "Short-form Video"),
     category:       ensureString(raw.category || "Value"),
+    content_angle:  ensureString(raw.content_angle || "hidden_edge"),
     player_name:    ensureString(raw.player_name || "Unknown"),
     player_id:      Number(raw.player_id ?? 0),
     team:           ensureString(raw.team || "Unknown"),
@@ -248,7 +361,7 @@ async function callOpenAI(systemPrompt: string, userPrompt: string): Promise<obj
     body: JSON.stringify({
       model: "gpt-4o",
       response_format: { type: "json_object" },
-      temperature: 0.85,
+      temperature: 0.92,
       max_tokens: 16000,
       messages: [
         { role: "system", content: systemPrompt },
@@ -283,18 +396,75 @@ async function callOpenAI(systemPrompt: string, userPrompt: string): Promise<obj
 }
 
 function buildFallbackPlan(players: PlayerData[], sel: ReturnType<typeof selectPlayers>): object {
-  const { valuePlayers, breakoutPlayers, trapPlayers, proofPlayers } = sel;
+  const { valuePlayers, breakoutPlayers, trapPlayers, captainPlayers, proofPlayers } = sel;
+
+  const contentTypeRotation: ContentType[] = [
+    "Short-form Video",
+    "Callout Post",
+    "Screen Recording",
+    "Graphic Post",
+    "Educational Breakdown",
+    "Comparison Post",
+    "Narrative Post",
+    "Hybrid Video",
+    "Graphic Post",
+    "Short-form Video",
+    "Callout Post",
+    "Screen Recording",
+    "Narrative Post",
+    "Graphic Post",
+    "Short-form Video",
+    "Hybrid Video",
+    "Callout Post",
+    "Screen Recording",
+    "Educational Breakdown",
+    "Short-form Video",
+    "Graphic Post",
+  ];
+
+  const angleRotation: ContentAngle[] = [
+    "hidden_edge", "trap_warning", "proof",
+    "market_inefficiency", "breakdown", "comparison",
+    "narrative", "must_have", "overpriced",
+    "captain_lock", "contrarian", "proof",
+    "risk_reward", "youre_wrong", "hidden_edge",
+    "market_inefficiency", "trap_warning", "proof",
+    "breakdown", "must_have", "contrarian",
+  ];
+
   const days = [];
+  let postIndex = 0;
 
   for (let day = 1; day <= 7; day++) {
-    const useBreakout = day % 2 === 0;
-    const post1Pool = useBreakout ? breakoutPlayers : valuePlayers;
-    const p1 = post1Pool[(day - 1) % post1Pool.length];
-    const trapPool = trapPlayers.length > 0 ? trapPlayers : players.slice(15, 25);
-    const p2 = trapPool[(day - 1) % trapPool.length];
-    const p3 = proofPlayers[(day - 1) % proofPlayers.length];
+    const usedIds = new Set<number>();
 
-    if (!p1 || !p2 || !p3) continue;
+    const pickPlayer = (pool: PlayerData[], fallback: PlayerData[]): PlayerData => {
+      const available = pool.find(p => !usedIds.has(p.player_id));
+      const p = available ?? fallback.find(p => !usedIds.has(p.player_id)) ?? pool[0] ?? fallback[0];
+      usedIds.add(p.player_id);
+      return p;
+    };
+
+    const angle0 = angleRotation[postIndex % angleRotation.length];
+    const angle1 = angleRotation[(postIndex + 1) % angleRotation.length];
+    const angle2 = angleRotation[(postIndex + 2) % angleRotation.length];
+
+    const isProof2 = angle2 === "proof";
+    const isTrap1 = angle1 === "trap_warning" || angle1 === "overpriced";
+
+    const p1 = pickPlayer(
+      angle0 === "captain_lock" || angle0 === "must_have" ? captainPlayers : valuePlayers,
+      players
+    );
+    const p2 = pickPlayer(isTrap1 ? trapPlayers : breakoutPlayers, players);
+    const p3 = pickPlayer(isProof2 ? proofPlayers : valuePlayers, players);
+
+    const type0 = contentTypeRotation[postIndex % contentTypeRotation.length];
+    const type1 = contentTypeRotation[(postIndex + 1) % contentTypeRotation.length];
+    const type2 = contentTypeRotation[(postIndex + 2) % contentTypeRotation.length];
+
+    const priceChangeStr = (p: PlayerData) =>
+      p.price_change !== 0 ? ` (${p.price_change > 0 ? "up" : "down"} $${Math.abs(Math.round(p.price_change / 1000))}k)` : "";
 
     days.push({
       day,
@@ -302,77 +472,118 @@ function buildFallbackPlan(players: PlayerData[], sel: ReturnType<typeof selectP
         {
           day,
           post_number: 1,
-          post_type: "Video",
-          category: useBreakout ? "Breakout" : "Value",
+          post_type: type0,
+          category: angle0 === "captain_lock" || angle0 === "must_have" ? "Captain" : "Value",
+          content_angle: angle0,
           player_name: p1.player_name,
           player_id: p1.player_id,
           team: p1.team,
           hooks: [
-            `The crowd hasn't found ${p1.player_name} yet — that's your window.`,
-            `${Math.round(p1.projection)} pts projected. Value score ${p1.value_score.toFixed(1)}. At rank ${p1.rank}... this is mispriced.`,
-            `Stop overthinking it. ${p1.player_name} is the best value play this round.`,
+            `${Math.round(p1.projection)} pts projected. $${Math.round(p1.price / 1000)}k. The market still hasn't noticed ${p1.player_name.split(" ").pop()}.`,
+            `Value score ${p1.value_score.toFixed(1)}. Ceiling ${Math.round(p1.ceiling)} pts. This is the most mispriced player in the comp.`,
+            `Stop sleeping on ${p1.player_name.split(" ").pop()} — the window to buy cheap closes this week.`,
           ],
           hook_options: [
-            `The crowd hasn't found ${p1.player_name} yet — that's your window.`,
-            `${Math.round(p1.projection)} pts projected. Value score ${p1.value_score.toFixed(1)}. At rank ${p1.rank}... this is mispriced.`,
-            `Stop overthinking it. ${p1.player_name} is the best value play this round.`,
+            `${Math.round(p1.projection)} pts projected. $${Math.round(p1.price / 1000)}k. The market still hasn't noticed ${p1.player_name.split(" ").pop()}.`,
+            `Value score ${p1.value_score.toFixed(1)}. Ceiling ${Math.round(p1.ceiling)} pts. This is the most mispriced player in the comp.`,
+            `Stop sleeping on ${p1.player_name.split(" ").pop()} — the window to buy cheap closes this week.`,
           ],
-          voice_script: `The crowd hasn't found ${p1.player_name} yet — and that is exactly your advantage. ${p1.team}... ranked ${p1.rank}... projecting ${Math.round(p1.projection)} points with a ceiling of ${Math.round(p1.ceiling)}. Value score ${p1.value_score.toFixed(1)} — that number means he is producing well above what his price demands. When the market corrects... it will be too late. Get on now. Full breakdown at Neeko Sports — link in bio.`,
-          full_script: `The crowd hasn't found ${p1.player_name} yet — and that is exactly your advantage. ${p1.team}... ranked ${p1.rank}... projecting ${Math.round(p1.projection)} points with a ceiling of ${Math.round(p1.ceiling)}. Value score ${p1.value_score.toFixed(1)} — that number means he is producing well above what his price demands. When the market corrects... it will be too late. Get on now. Full breakdown at Neeko Sports — link in bio.`,
-          caption_script: `${p1.player_name} is the most mispriced player in the comp right now.\n\n${Math.round(p1.projection)} pts projected. Value score ${p1.value_score.toFixed(1)}. The coaches winning their leagues already own him.\n\nDon't wait for the price rise — get the full breakdown at Neeko Sports. #AFLFantasy #AFLSupercoach #ValueLock #${p1.team.replace(/\s+/g, "")}`,
-          caption: `${p1.player_name} is the most mispriced player in the comp right now.\n\n${Math.round(p1.projection)} pts projected. Value score ${p1.value_score.toFixed(1)}. The coaches winning their leagues already own him.\n\nDon't wait for the price rise — get the full breakdown at Neeko Sports. #AFLFantasy #AFLSupercoach #ValueLock #${p1.team.replace(/\s+/g, "")}`,
-          visual_plan: `Scene 1 (0-2s): Bold "MISPRICED" text slams in on black background — green glow, fast zoom. Scene 2 (2-5s): Player name + team in large white text, dark gradient bg with green accent border. Scene 3 (5-12s): Three stat cards pop in from bottom — "PROJ: ${Math.round(p1.projection)} PTS", "VALUE: ${p1.value_score.toFixed(1)}", "CEILING: ${Math.round(p1.ceiling)} PTS" — each with 0.3s delay, sharp pop animation. Scene 4 (12-20s): "BUY BEFORE THE MARKET CATCHES UP" in bold green, pulse effect. Scene 5 (20-30s): Neeko Sports logo on dark bg, "Link in bio — get the edge". Colour scheme: #00C853 green on #0D0D0D. Font: Heavy condensed sans-serif, all caps. Motion: Hard cuts, fast zoom transitions, stat cards pop-in.`,
+          voice_script: `The market hasn't caught up to ${p1.player_name} yet — and that is your edge. ${p1.team}... projecting ${Math.round(p1.projection)} points... ceiling ${Math.round(p1.ceiling)}... priced at $${Math.round(p1.price / 1000)}k${priceChangeStr(p1)}. Value score ${p1.value_score.toFixed(1)} — that is elite output at a price that doesn't match. ${p1.consistency >= 65 ? `Consistency at ${Math.round(p1.consistency)}% — this is not a fluke.` : `High upside at ${p1.upside_pct?.toFixed(0) ?? "?"}% — the ceiling is real.`} The window is now. Full breakdown at Neeko Sports — link in bio.`,
+          full_script: `The market hasn't caught up to ${p1.player_name} yet — and that is your edge. ${p1.team}... projecting ${Math.round(p1.projection)} points... ceiling ${Math.round(p1.ceiling)}... priced at $${Math.round(p1.price / 1000)}k${priceChangeStr(p1)}. Value score ${p1.value_score.toFixed(1)} — that is elite output at a price that doesn't match. ${p1.consistency >= 65 ? `Consistency at ${Math.round(p1.consistency)}% — this is not a fluke.` : `High upside at ${p1.upside_pct?.toFixed(0) ?? "?"}% — the ceiling is real.`} The window is now. Full breakdown at Neeko Sports — link in bio.`,
+          caption_script: `${p1.player_name} is the most mispriced player in the comp right now — and most coaches haven't noticed yet.\n\n${Math.round(p1.projection)} pts projected this round. Value score ${p1.value_score.toFixed(1)}. Ceiling ${Math.round(p1.ceiling)} pts at $${Math.round(p1.price / 1000)}k${priceChangeStr(p1)}.\n\nFull edge breakdown at Neeko Sports — link in bio. #AFLFantasy #AFLSupercoach #NeekoSports #ValueLock`,
+          caption: `${p1.player_name} is the most mispriced player in the comp right now — and most coaches haven't noticed yet.\n\n${Math.round(p1.projection)} pts projected this round. Value score ${p1.value_score.toFixed(1)}. Ceiling ${Math.round(p1.ceiling)} pts at $${Math.round(p1.price / 1000)}k${priceChangeStr(p1)}.\n\nFull edge breakdown at Neeko Sports — link in bio. #AFLFantasy #AFLSupercoach #NeekoSports #ValueLock`,
+          visual_plan: `Scene 1 (0-2s): Black background. Bold "MISPRICED" text slams in from bottom with a hard green glow — font: heavy condensed all-caps, colour #00C853. Fast zoom from 80% to 100% scale. Scene 2 (2-5s): Player name "${p1.player_name}" in large white text (left-aligned), team "${p1.team}" in smaller grey below. Dark charcoal background (#111111) with a thin green left-border accent. Hard cut in. Scene 3 (5-11s): Three stat cards pop in sequentially (0.25s delay each) from the bottom — Card 1: "PROJ ${Math.round(p1.projection)} PTS" (green), Card 2: "VALUE ${p1.value_score.toFixed(1)}" (green), Card 3: "CEIL ${Math.round(p1.ceiling)} PTS" (green). Each card: white text on dark card with green bottom border. Scene 4 (11-18s): Full-width text slides in from right — "BUY BEFORE THE MARKET CORRECTS" in bold white, "#00C853 underline". Subtle pulse animation. Scene 5 (18-22s): Dark end card. Neeko Sports logo centred (white on black). Text below: "Full breakdown — link in bio". Subtle fade-in animation. Colour palette: #00C853 green, #0D0D0D black, #FFFFFF white. Font: Heavy condensed sans-serif, all-caps for stat labels, sentence-case for body.`,
         },
         {
           day,
           post_number: 2,
-          post_type: "Image",
-          category: "Trap",
+          post_type: type1,
+          category: isTrap1 ? "Trap" : "Breakout",
+          content_angle: angle1,
           player_name: p2.player_name,
           player_id: p2.player_id,
           team: p2.team,
-          hooks: [
-            `You're about to make a costly mistake bringing in ${p2.player_name}.`,
-            `Value score ${p2.value_score.toFixed(1)}. At rank ${p2.rank}... that is a trap. The data is clear.`,
-            `Everyone is trading in ${p2.player_name} this week — which is exactly the problem.`,
+          hooks: isTrap1 ? [
+            `You're about to make a $${Math.round(p2.price / 1000)}k mistake — ${p2.player_name.split(" ").pop()} is a trap.`,
+            `Value score ${p2.value_score.toFixed(1)} at rank ${p2.rank}. The data says avoid — are you listening?`,
+            `Everyone is trading in ${p2.player_name.split(" ").pop()} this week. That's exactly the problem.`,
+          ] : [
+            `${p2.player_name.split(" ").pop()} is about to explode — upside ${p2.upside_pct?.toFixed(0) ?? "?"}%, ceiling ${Math.round(p2.ceiling)} pts.`,
+            `Form ${Math.round(p2.form_score)}. Projection ${Math.round(p2.projection)} pts. The breakout is already happening.`,
+            `Get ${p2.player_name.split(" ").pop()} before the price rises — this window won't last.`,
           ],
-          hook_options: [
-            `You're about to make a costly mistake bringing in ${p2.player_name}.`,
-            `Value score ${p2.value_score.toFixed(1)}. At rank ${p2.rank}... that is a trap. The data is clear.`,
-            `Everyone is trading in ${p2.player_name} this week — which is exactly the problem.`,
+          hook_options: isTrap1 ? [
+            `You're about to make a $${Math.round(p2.price / 1000)}k mistake — ${p2.player_name.split(" ").pop()} is a trap.`,
+            `Value score ${p2.value_score.toFixed(1)} at rank ${p2.rank}. The data says avoid — are you listening?`,
+            `Everyone is trading in ${p2.player_name.split(" ").pop()} this week. That's exactly the problem.`,
+          ] : [
+            `${p2.player_name.split(" ").pop()} is about to explode — upside ${p2.upside_pct?.toFixed(0) ?? "?"}%, ceiling ${Math.round(p2.ceiling)} pts.`,
+            `Form ${Math.round(p2.form_score)}. Projection ${Math.round(p2.projection)} pts. The breakout is already happening.`,
+            `Get ${p2.player_name.split(" ").pop()} before the price rises — this window won't last.`,
           ],
-          voice_script: `You're about to make a costly mistake. ${p2.player_name}... the name looks fine, the rank seems solid — but the value score is ${p2.value_score.toFixed(1)}. That means you are paying a premium for output that doesn't justify it. While everyone follows the herd... smart coaches are already in better positions. The data called it. Don't ignore it. Full breakdown at Neeko Sports — link in bio.`,
-          full_script: `You're about to make a costly mistake. ${p2.player_name}... the name looks fine, the rank seems solid — but the value score is ${p2.value_score.toFixed(1)}. That means you are paying a premium for output that doesn't justify it. While everyone follows the herd... smart coaches are already in better positions. The data called it. Don't ignore it. Full breakdown at Neeko Sports — link in bio.`,
-          caption_script: `${p2.player_name} is the most dangerous trade this week — and most coaches don't see it yet.\n\nValue score ${p2.value_score.toFixed(1)} at rank ${p2.rank}. Overpriced. Over-traded. Underperforming relative to cost.\n\nThe full trap breakdown is live at Neeko Sports. Don't say we didn't warn you. #AFLFantasy #TrapAlert #AFLSupercoach #NeekoSports`,
-          caption: `${p2.player_name} is the most dangerous trade this week — and most coaches don't see it yet.\n\nValue score ${p2.value_score.toFixed(1)} at rank ${p2.rank}. Overpriced. Over-traded. Underperforming relative to cost.\n\nThe full trap breakdown is live at Neeko Sports. Don't say we didn't warn you. #AFLFantasy #TrapAlert #AFLSupercoach #NeekoSports`,
-          visual_plan: `Scene 1 (0-2s): "TRAP" in bold red slams in with a shake animation on black — caution icon flashes. Scene 2 (2-5s): Player name in large red text with a red border overlay, hard cut. Scene 3 (5-12s): Stat card crashes in — "VALUE SCORE: ${p2.value_score.toFixed(1)}" with a red "DANGER" badge next to it, then "RANK: ${p2.rank}" below. Scene 4 (12-20s): "EVERYONE'S WRONG" flashes in amber, then cuts to "DON'T FOLLOW THE HERD" in red bold. Scene 5 (20-30s): Neeko Sports logo — "Better picks inside — link in bio". Colour scheme: #D32F2F red and #FF8F00 amber on #0D0D0D. Motion: Shake on open, hard cuts, stat card crash-in.`,
+          voice_script: isTrap1
+            ? `Stop. Before you trade in ${p2.player_name} — look at the data. ${p2.team}... rank ${p2.rank}... looks solid on the surface. But value score? ${p2.value_score.toFixed(1)}. That means you are paying $${Math.round(p2.price / 1000)}k for output that does not justify it. Floor sits at ${Math.round(p2.floor)} points — that is your downside risk. The coaches who win their leagues check Neeko before they pull the trigger. Full breakdown at Neeko Sports — link in bio.`
+            : `${p2.player_name} is in the middle of a breakout — and most coaches have missed it. ${p2.team}... form score ${Math.round(p2.form_score)}... projecting ${Math.round(p2.projection)} points with a ceiling of ${Math.round(p2.ceiling)}. Upside rating ${p2.upside_pct?.toFixed(0) ?? "?"}% — this is a player trending the right way at a price that hasn't caught up yet. The window to get them cheap is closing fast. Full breakdown at Neeko Sports — link in bio.`,
+          full_script: isTrap1
+            ? `Stop. Before you trade in ${p2.player_name} — look at the data. ${p2.team}... rank ${p2.rank}... looks solid on the surface. But value score? ${p2.value_score.toFixed(1)}. That means you are paying $${Math.round(p2.price / 1000)}k for output that does not justify it. Floor sits at ${Math.round(p2.floor)} points — that is your downside risk. The coaches who win their leagues check Neeko before they pull the trigger. Full breakdown at Neeko Sports — link in bio.`
+            : `${p2.player_name} is in the middle of a breakout — and most coaches have missed it. ${p2.team}... form score ${Math.round(p2.form_score)}... projecting ${Math.round(p2.projection)} points with a ceiling of ${Math.round(p2.ceiling)}. Upside rating ${p2.upside_pct?.toFixed(0) ?? "?"}% — this is a player trending the right way at a price that hasn't caught up yet. The window to get them cheap is closing fast. Full breakdown at Neeko Sports — link in bio.`,
+          caption_script: isTrap1
+            ? `${p2.player_name} is the most dangerous trade this week — the data is clear.\n\nValue score ${p2.value_score.toFixed(1)} at rank ${p2.rank}. $${Math.round(p2.price / 1000)}k for a floor of just ${Math.round(p2.floor)} pts. The risk-reward is wrong.\n\nFull trap breakdown live at Neeko Sports — don't say we didn't warn you. #AFLFantasy #TrapAlert #AFLSupercoach #NeekoSports`
+            : `${p2.player_name} is breaking out — and the price hasn't caught up yet.\n\nForm score ${Math.round(p2.form_score)}. Ceiling ${Math.round(p2.ceiling)} pts. Upside ${p2.upside_pct?.toFixed(0) ?? "?"}% at $${Math.round(p2.price / 1000)}k${priceChangeStr(p2)}.\n\nFull breakout breakdown at Neeko Sports — link in bio. #AFLFantasy #AFLSupercoach #NeekoSports #Breakout`,
+          caption: isTrap1
+            ? `${p2.player_name} is the most dangerous trade this week — the data is clear.\n\nValue score ${p2.value_score.toFixed(1)} at rank ${p2.rank}. $${Math.round(p2.price / 1000)}k for a floor of just ${Math.round(p2.floor)} pts. The risk-reward is wrong.\n\nFull trap breakdown live at Neeko Sports — don't say we didn't warn you. #AFLFantasy #TrapAlert #AFLSupercoach #NeekoSports`
+            : `${p2.player_name} is breaking out — and the price hasn't caught up yet.\n\nForm score ${Math.round(p2.form_score)}. Ceiling ${Math.round(p2.ceiling)} pts. Upside ${p2.upside_pct?.toFixed(0) ?? "?"}% at $${Math.round(p2.price / 1000)}k${priceChangeStr(p2)}.\n\nFull breakout breakdown at Neeko Sports — link in bio. #AFLFantasy #AFLSupercoach #NeekoSports #Breakout`,
+          visual_plan: isTrap1
+            ? `Top zone: "TRAP ALERT" in heavy all-caps red (#D32F2F) with a caution triangle icon — slam-in animation with a brief shake (0.15s). Middle zone: Player name "${p2.player_name}" in large white text (slightly right-aligned to leave left space for icon). Below name: "${p2.team}" in smaller grey text. Left zone: vertical red warning bar. Bottom zone: Two stat pills — "VALUE ${p2.value_score.toFixed(1)}" in red pill, "FLOOR ${Math.round(p2.floor)} PTS" in amber pill (#FF8F00). Below stats: "DON'T FOLLOW THE CROWD" in bold white italic. Background: Near-black (#0D0D0D) with a subtle red radial glow behind the player name area. Font: Heavy condensed all-caps for headline, medium weight for body. No player image — pure data graphic.`
+            : `Scene 1 (0-2s): Dark background. "BREAKOUT IN PROGRESS" in amber-to-green gradient text (#FF8F00 → #00C853), slides in from left, fade-in. Bold heavy condensed font. Scene 2 (2-6s): Player name "${p2.player_name}" in large white text. Team "${p2.team}" below in smaller grey. Thin green left-border accent panel. Hard cut in. Scene 3 (6-12s): Animated stats — "FORM ${Math.round(p2.form_score)}" flashes green, then "CEILING ${Math.round(p2.ceiling)} PTS" appears below (green), then "UPSIDE ${p2.upside_pct?.toFixed(0) ?? "?"}%" in amber — each with 0.3s delay, pop-in animation. Scene 4 (12-20s): "GET ON BEFORE THE PRICE RISES" in bold white, green underline pulse effect. Scene 5 (20-25s): End card — Neeko logo on black, "Full breakdown — link in bio". Fade in. Colour palette: #00C853 (primary), #FF8F00 (accent), #0D0D0D (background), white for text.`,
         },
         {
           day,
           post_number: 3,
-          post_type: "Screen Recording",
-          category: "Proof",
+          post_type: type2,
+          category: isProof2 ? "Proof" : "Value",
+          content_angle: angle2,
           player_name: p3.player_name,
           player_id: p3.player_id,
           team: p3.team,
-          hooks: [
-            `This data is what separates the coaches winning their leagues from everyone else.`,
-            `${Math.round(p3.projection)} pts projected. Rank #${p3.rank}. This is what Neeko's model sees — right now.`,
-            `${p3.player_name} is ranked #${p3.rank} on Neeko. Most coaches have no idea.`,
+          hooks: isProof2 ? [
+            `This is what winning coaches have access to that you don't — yet.`,
+            `${Math.round(p3.projection)} pts projected. Rank #${p3.rank}. This is Neeko's live model — running right now.`,
+            `${p3.player_name.split(" ").pop()} is ranked #${p3.rank} on Neeko. Most coaches haven't even looked here.`,
+          ] : [
+            `${Math.round(p3.projection)} pts projected. $${Math.round(p3.price / 1000)}k. Value score ${p3.value_score.toFixed(1)}. Why isn't everyone talking about ${p3.player_name.split(" ").pop()}?`,
+            `The data is screaming ${p3.player_name.split(" ").pop()} — consistency ${Math.round(p3.consistency)}%, ceiling ${Math.round(p3.ceiling)} pts.`,
+            `You found the edge. Now act on it. ${p3.player_name.split(" ").pop()} is the move this week.`,
           ],
-          hook_options: [
-            `This data is what separates the coaches winning their leagues from everyone else.`,
-            `${Math.round(p3.projection)} pts projected. Rank #${p3.rank}. This is what Neeko's model sees — right now.`,
-            `${p3.player_name} is ranked #${p3.rank} on Neeko. Most coaches have no idea.`,
+          hook_options: isProof2 ? [
+            `This is what winning coaches have access to that you don't — yet.`,
+            `${Math.round(p3.projection)} pts projected. Rank #${p3.rank}. This is Neeko's live model — running right now.`,
+            `${p3.player_name.split(" ").pop()} is ranked #${p3.rank} on Neeko. Most coaches haven't even looked here.`,
+          ] : [
+            `${Math.round(p3.projection)} pts projected. $${Math.round(p3.price / 1000)}k. Value score ${p3.value_score.toFixed(1)}. Why isn't everyone talking about ${p3.player_name.split(" ").pop()}?`,
+            `The data is screaming ${p3.player_name.split(" ").pop()} — consistency ${Math.round(p3.consistency)}%, ceiling ${Math.round(p3.ceiling)} pts.`,
+            `You found the edge. Now act on it. ${p3.player_name.split(" ").pop()} is the move this week.`,
           ],
-          voice_script: `This is the Neeko live rankings board — the exact data our members use to make trade decisions every single round. ${p3.player_name}... rank ${p3.rank}... projecting ${Math.round(p3.projection)} points... captain score ${Math.round(p3.captain_score)}. Every number you see here is updated in real time. If you are building your AFL Fantasy team without this... you are working blind while everyone else has the answers. Neeko Sports — link in bio.`,
-          full_script: `This is the Neeko live rankings board — the exact data our members use to make trade decisions every single round. ${p3.player_name}... rank ${p3.rank}... projecting ${Math.round(p3.projection)} points... captain score ${Math.round(p3.captain_score)}. Every number you see here is updated in real time. If you are building your AFL Fantasy team without this... you are working blind while everyone else has the answers. Neeko Sports — link in bio.`,
-          caption_script: `This is the data your league rivals don't want you to see.\n\n${p3.player_name} ranked #${p3.rank} on Neeko's live model — ${Math.round(p3.projection)} pts projected, captain score ${Math.round(p3.captain_score)}. This is what winning coaches are acting on right now.\n\nFull access at Neeko Sports — link in bio. #AFLFantasy #AFLSupercoach #NeekoSports #DataDriven`,
-          caption: `This is the data your league rivals don't want you to see.\n\n${p3.player_name} ranked #${p3.rank} on Neeko's live model — ${Math.round(p3.projection)} pts projected, captain score ${Math.round(p3.captain_score)}. This is what winning coaches are acting on right now.\n\nFull access at Neeko Sports — link in bio. #AFLFantasy #AFLSupercoach #NeekoSports #DataDriven`,
-          visual_plan: `Screen recording of Neeko live rankings table — zoom in slowly to show top 10 clearly. Cursor moves to highlight ${p3.player_name}'s row, pausing on projection and captain score stats. Scroll down slowly past 3-4 more players to show depth of data. Overlay text pinned top-left: "LIVE RANKINGS — NEEKO SPORTS" in small white bold text. End with a slow zoom-out, then cut to dark end card: Neeko logo centred, "Try it free — link in bio" below. Style: clean minimal UI, green highlights on key stats, let the data do the selling.`,
+          voice_script: isProof2
+            ? `This is the Neeko live rankings board — exactly what our members use to make trade decisions every round. ${p3.player_name}... rank ${p3.rank}... projecting ${Math.round(p3.projection)} points... captain score ${Math.round(p3.captain_score)}. Consistency ${Math.round(p3.consistency)}%... ceiling ${Math.round(p3.ceiling)} pts. Every number you see is live. If you are making AFL Fantasy decisions without this data... you are working blind. Neeko Sports — link in bio.`
+            : `Here is a player the data is backing hard right now — ${p3.player_name}. ${p3.team}... projecting ${Math.round(p3.projection)} points this round... value score ${p3.value_score.toFixed(1)}... consistency ${Math.round(p3.consistency)}%. The signals are aligned. Projection confidence, form, matchup — all pointing the same direction. This is not a guess. This is what the model says. Full breakdown at Neeko Sports — link in bio.`,
+          full_script: isProof2
+            ? `This is the Neeko live rankings board — exactly what our members use to make trade decisions every round. ${p3.player_name}... rank ${p3.rank}... projecting ${Math.round(p3.projection)} points... captain score ${Math.round(p3.captain_score)}. Consistency ${Math.round(p3.consistency)}%... ceiling ${Math.round(p3.ceiling)} pts. Every number you see is live. If you are making AFL Fantasy decisions without this data... you are working blind. Neeko Sports — link in bio.`
+            : `Here is a player the data is backing hard right now — ${p3.player_name}. ${p3.team}... projecting ${Math.round(p3.projection)} points this round... value score ${p3.value_score.toFixed(1)}... consistency ${Math.round(p3.consistency)}%. The signals are aligned. Projection confidence, form, matchup — all pointing the same direction. This is not a guess. This is what the model says. Full breakdown at Neeko Sports — link in bio.`,
+          caption_script: isProof2
+            ? `This is the data your league rivals don't want you to see.\n\n${p3.player_name} — rank #${p3.rank}, ${Math.round(p3.projection)} pts projected, captain score ${Math.round(p3.captain_score)}, consistency ${Math.round(p3.consistency)}%. This is what winning coaches act on.\n\nFull access at Neeko Sports — link in bio. #AFLFantasy #AFLSupercoach #NeekoSports #DataDriven`
+            : `${p3.player_name} is the data-backed pick this week — the signals don't lie.\n\nProjection ${Math.round(p3.projection)} pts. Value ${p3.value_score.toFixed(1)}. Consistency ${Math.round(p3.consistency)}% over ${p3.games_played} games.\n\nFull model breakdown at Neeko Sports — link in bio. #AFLFantasy #AFLSupercoach #NeekoSports #EdgePlay`,
+          caption: isProof2
+            ? `This is the data your league rivals don't want you to see.\n\n${p3.player_name} — rank #${p3.rank}, ${Math.round(p3.projection)} pts projected, captain score ${Math.round(p3.captain_score)}, consistency ${Math.round(p3.consistency)}%. This is what winning coaches act on.\n\nFull access at Neeko Sports — link in bio. #AFLFantasy #AFLSupercoach #NeekoSports #DataDriven`
+            : `${p3.player_name} is the data-backed pick this week — the signals don't lie.\n\nProjection ${Math.round(p3.projection)} pts. Value ${p3.value_score.toFixed(1)}. Consistency ${Math.round(p3.consistency)}% over ${p3.games_played} games.\n\nFull model breakdown at Neeko Sports — link in bio. #AFLFantasy #AFLSupercoach #NeekoSports #EdgePlay`,
+          visual_plan: isProof2
+            ? `Step 1: Open Neeko Sports on desktop — navigate directly to AFL Rankings page. Cursor movement: slow and deliberate, 1.5s to settle on page. Step 2: Scroll slowly down the rankings table at ~80px/s — let viewers read the top 5 player rows. Pause 1.5s on row. Step 3: Move cursor to highlight ${p3.player_name}'s row — hover 2s. Zoom in 1.3× on projection value (${Math.round(p3.projection)} pts) and captain score (${Math.round(p3.captain_score)}). Pause 2s. Step 4: Click player name to open player detail. Let the profile load. Scroll slowly through projection chart and AI summary section — pause 2s on the AI recommendation badge. Step 5: Scroll back to top of rankings table, zoom out to show the full board. Step 6: Cut to dark end card. Neeko logo centred. Text: "Try it free — link in bio". Overlay text throughout: "LIVE RANKINGS — NEEKO SPORTS" pinned top-left in small white bold. Style: Minimal UI, green highlights on key stats, clean pacing.`
+            : `Top section (40% of frame): Dark background (#111111). Headline text: "${p3.player_name.split(" ").pop()} — DATA BACKED" in heavy white condensed font, all-caps. Subline: "${p3.team} | Rank #${p3.rank}" in smaller grey. Middle section (40%): Three horizontal data bars — "PROJECTION ${Math.round(p3.projection)} PTS" with a green fill bar at ${Math.round((p3.projection / 160) * 100)}% width. "CONSISTENCY ${Math.round(p3.consistency)}%" with green fill bar. "VALUE SCORE ${p3.value_score.toFixed(1)}" with green fill bar. Each bar animates left-to-right on reveal (0.4s each, staggered 0.2s). Bottom section (20%): "FULL BREAKDOWN — LINK IN BIO" in small white uppercase. Neeko logo bottom-right corner. Background: Solid #0D0D0D. Accent: #00C853 (green) for bars, #FFFFFF for primary text, #888888 for secondary labels. Font: Inter or similar, heavy weight for headline, medium for stats.`,
         },
       ],
     });
+
+    postIndex += 3;
   }
 
   return { week_key: getWeekKey(), days };
@@ -415,11 +626,11 @@ Deno.serve(async (req: Request) => {
     const { data: players, error: playersError } = await db
       .schema("afl")
       .from("player_rankings_cache")
-      .select("player_id, player_name, team, projection_final, ceiling, price, value_score, form_score, consistency, captain_score, neeko_rating_scaled, is_available")
+      .select("player_id, player_name, team, position, projection_final, ceiling, floor, price, prev_price, price_change, value_score, best_value_score, form_score, consistency, captain_score, risk_rating, upside_pct, matchup_label, signal, ai_recommendation, recommendation_short, market_watch_category, games_played, neeko_rating_scaled, is_available")
       .eq("is_available", true)
       .not("projection_final", "is", null)
       .order("neeko_rating_scaled", { ascending: false, nullsFirst: false })
-      .limit(50);
+      .limit(60);
 
     if (playersError) throw new Error(`DB error: ${playersError.message}`);
     if (!players || players.length === 0) throw new Error("No available players found in rankings cache");
@@ -427,17 +638,30 @@ Deno.serve(async (req: Request) => {
     console.log(`Fetched ${players.length} players`);
 
     const mappedPlayers: PlayerData[] = players.map((p: Record<string, unknown>, i: number) => ({
-      player_id:     Number(p.player_id ?? 0),
-      player_name:   String(p.player_name ?? "Unknown"),
-      team:          String(p.team ?? "Unknown"),
-      projection:    Number(p.projection_final ?? 0),
-      ceiling:       Number(p.ceiling ?? 0),
-      price:         Number(p.price ?? 0),
-      value_score:   Number(p.value_score ?? 0),
-      rank:          i + 1,
-      form_score:    Number(p.form_score ?? 0),
-      consistency:   Number(p.consistency ?? 0),
-      captain_score: Number(p.captain_score ?? 0),
+      player_id:            Number(p.player_id ?? 0),
+      player_name:          String(p.player_name ?? "Unknown"),
+      team:                 String(p.team ?? "Unknown"),
+      position:             String(p.position ?? ""),
+      projection:           Number(p.projection_final ?? 0),
+      ceiling:              Number(p.ceiling ?? 0),
+      floor:                Number(p.floor ?? 0),
+      price:                Number(p.price ?? 0),
+      prev_price:           Number(p.prev_price ?? 0),
+      price_change:         Number(p.price_change ?? 0),
+      value_score:          Number(p.value_score ?? 0),
+      best_value_score:     Number(p.best_value_score ?? 0),
+      rank:                 i + 1,
+      form_score:           Number(p.form_score ?? 0),
+      consistency:          Number(p.consistency ?? 0),
+      captain_score:        Number(p.captain_score ?? 0),
+      risk_rating:          Number(p.risk_rating ?? 0),
+      upside_pct:           Number(p.upside_pct ?? 0),
+      matchup_label:        String(p.matchup_label ?? ""),
+      signal:               String(p.signal ?? ""),
+      ai_recommendation:    String(p.ai_recommendation ?? ""),
+      recommendation_short: String(p.recommendation_short ?? ""),
+      market_watch_category: String(p.market_watch_category ?? ""),
+      games_played:         Number(p.games_played ?? 0),
     }));
 
     const selections = selectPlayers(mappedPlayers);
@@ -448,7 +672,7 @@ Deno.serve(async (req: Request) => {
 
     if (hasOpenAI) {
       try {
-        console.log("Calling OpenAI...");
+        console.log("Calling OpenAI gpt-4o...");
         planData = await callOpenAI(
           buildSystemPrompt(),
           buildUserPrompt(mappedPlayers, selections, focusPlayerName),

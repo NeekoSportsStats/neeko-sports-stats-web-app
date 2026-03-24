@@ -1,11 +1,21 @@
 import { useState, useEffect, useCallback } from "react";
-import { RefreshCw, Calendar, Video, Image, Monitor, Copy, Check, ChevronDown, ChevronUp, Zap, TriangleAlert as AlertTriangle, Star, TrendingUp, FileText, Eye, Play, Mic, ChevronRight, Brain, Flame, Target, Smartphone, ChartBar as BarChart2, List } from "lucide-react";
+import { RefreshCw, Calendar, Video, Image, Monitor, Copy, Check, ChevronDown, ChevronUp, Zap, TriangleAlert as AlertTriangle, Star, TrendingUp, FileText, Eye, Play, Mic, ChevronRight, Brain, Flame, Target, Smartphone, ChartBar as BarChart2, List, GitCompare, BookOpen, Megaphone, Layers } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { useToast } from "@/hooks/use-toast";
 
 // ── TYPES ─────────────────────────────────────────────────────────────────────
 
-type PostType = "Video" | "Image" | "Screen Recording";
+type PostType =
+  | "Video"
+  | "Image"
+  | "Screen Recording"
+  | "Short-form Video"
+  | "Graphic Post"
+  | "Hybrid Video"
+  | "Comparison Post"
+  | "Narrative Post"
+  | "Callout Post"
+  | "Educational Breakdown";
 type PostCategory = "Value" | "Breakout" | "Trap" | "Captain" | "Proof";
 type PostTab = "voice" | "hooks" | "visual" | "caption" | "ai" | "platform" | "strategy";
 type Platform = "tiktok" | "instagram" | "reddit";
@@ -22,6 +32,7 @@ interface PostPlan {
   day: number;
   post_number: number;
   post_type: PostType;
+  content_angle?: string;
   category: PostCategory;
   player_name: string;
   player_id: number;
@@ -84,6 +95,29 @@ const POST_TYPE_ICON: Record<PostType, React.ElementType> = {
   "Video": Video,
   "Image": Image,
   "Screen Recording": Monitor,
+  "Short-form Video": Video,
+  "Graphic Post": Image,
+  "Hybrid Video": Layers,
+  "Comparison Post": GitCompare,
+  "Narrative Post": BookOpen,
+  "Callout Post": Megaphone,
+  "Educational Breakdown": BookOpen,
+};
+
+const ANGLE_LABELS: Record<string, { label: string; color: string }> = {
+  hidden_edge:         { label: "Hidden Edge",       color: "text-emerald-600 dark:text-emerald-400" },
+  market_inefficiency: { label: "Market Edge",        color: "text-blue-600 dark:text-blue-400" },
+  must_have:           { label: "Must Have",           color: "text-emerald-700 dark:text-emerald-300" },
+  captain_lock:        { label: "Captain Lock",        color: "text-blue-700 dark:text-blue-300" },
+  trap_warning:        { label: "Trap Warning",        color: "text-red-600 dark:text-red-400" },
+  overpriced:          { label: "Overpriced",          color: "text-red-700 dark:text-red-300" },
+  risk_reward:         { label: "Risk/Reward",         color: "text-orange-600 dark:text-orange-400" },
+  contrarian:          { label: "Contrarian",          color: "text-orange-700 dark:text-orange-300" },
+  comparison:          { label: "Comparison",          color: "text-slate-600 dark:text-slate-400" },
+  youre_wrong:         { label: "You're Wrong",        color: "text-red-500 dark:text-red-400" },
+  breakdown:           { label: "Breakdown",           color: "text-blue-500 dark:text-blue-400" },
+  narrative:           { label: "Narrative",           color: "text-slate-500 dark:text-slate-400" },
+  proof:               { label: "Proof",               color: "text-slate-700 dark:text-slate-300" },
 };
 
 const POST_TABS: { id: PostTab; label: string; icon: React.ElementType }[] = [
@@ -240,11 +274,35 @@ function getPostStrategy(category: PostCategory, postType: PostType): PostStrate
 
   const strategy = strategies[category] ?? strategies.Value;
 
-  if (postType === "Screen Recording") {
+  if (postType === "Screen Recording" || postType === "Educational Breakdown" || postType === "Hybrid Video") {
     return {
       ...strategy,
       goal: strategy.goal + " (screen recording adds credibility through product demonstration)",
       callToAction: "Try it yourself — link in bio for free access",
+    };
+  }
+
+  if (postType === "Comparison Post") {
+    return {
+      ...strategy,
+      goal: strategy.goal + " (comparison framing makes the decision obvious for the viewer)",
+      callToAction: "See the full comparison breakdown in the Neeko rankings — link in bio",
+    };
+  }
+
+  if (postType === "Callout Post") {
+    return {
+      ...strategy,
+      goal: strategy.goal + " (callout format is highly shareable — ideal for reach growth)",
+      callToAction: "Share this with your league — they need to see this",
+    };
+  }
+
+  if (postType === "Narrative Post") {
+    return {
+      ...strategy,
+      goal: strategy.goal + " (story-driven format builds emotional connection and saves)",
+      callToAction: "Follow for the full story this week — updated after every round",
     };
   }
 
@@ -400,6 +458,101 @@ function PlatformVariantsTabContent({ post }: { post: PostPlan }) {
   );
 }
 
+// ── VISUAL PLAN RENDERER ──────────────────────────────────────────────────────
+
+interface SceneBlock {
+  label: string;
+  timing?: string;
+  content: string;
+}
+
+function parseProductionBrief(text: string): SceneBlock[] {
+  const blocks: SceneBlock[] = [];
+  const lines = text.split("\n");
+  let current: SceneBlock | null = null;
+
+  for (const line of lines) {
+    const sceneMatch = line.match(/^(Scene\s*\d+|Step\s*\d+|Hook|Overlay|CTA|Background|Color|Animation|Text|Layout|Design|Production)\s*[\(:]?([\d\-–s]*)\)?:?\s*(.*)/i);
+    if (sceneMatch) {
+      if (current) blocks.push(current);
+      const timing = sceneMatch[2]?.trim() || undefined;
+      const rest = sceneMatch[3]?.trim() || "";
+      current = { label: sceneMatch[1].trim(), timing, content: rest };
+    } else if (current && line.trim()) {
+      current.content += (current.content ? "\n" : "") + line.trim();
+    } else if (!current && line.trim()) {
+      if (blocks.length === 0) {
+        blocks.push({ label: "Brief", content: line.trim() });
+        current = blocks[blocks.length - 1];
+      } else {
+        blocks[blocks.length - 1].content += "\n" + line.trim();
+      }
+    }
+  }
+  if (current && !blocks.includes(current)) blocks.push(current);
+  return blocks.filter((b) => b.content.length > 0);
+}
+
+function isProductionBrief(text: string): boolean {
+  return /scene\s*\d+|step\s*\d+\s*\(/i.test(text);
+}
+
+function VisualPlanTabContent({ post }: { post: PostPlan }) {
+  const { copied, copy } = useCopy();
+  const raw = typeof post.visual_plan === "string" ? post.visual_plan : JSON.stringify(post.visual_plan, null, 2);
+  const isParseable = isProductionBrief(raw);
+  const blocks = isParseable ? parseProductionBrief(raw) : [];
+
+  const sceneColors = [
+    "border-blue-500/30 bg-blue-500/5",
+    "border-emerald-500/30 bg-emerald-500/5",
+    "border-orange-500/30 bg-orange-500/5",
+    "border-slate-500/30 bg-slate-500/5",
+    "border-red-500/30 bg-red-500/5",
+    "border-cyan-500/30 bg-cyan-500/5",
+  ];
+
+  return (
+    <div className="p-4 space-y-3">
+      <div className="flex items-center justify-between mb-1">
+        <div>
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Visual Plan</p>
+          {isParseable && <p className="text-[10px] text-muted-foreground/70 mt-0.5">{blocks.length} scenes · {post.post_type}</p>}
+        </div>
+        <button
+          onClick={() => copy(raw, "visual-plan")}
+          className="flex items-center gap-1.5 px-2.5 py-1.5 border border-border text-xs rounded-md hover:bg-accent transition-colors"
+        >
+          {copied === "visual-plan" ? <><Check className="h-3.5 w-3.5 text-emerald-500" /> Copied!</> : <><Copy className="h-3.5 w-3.5" /> Copy</>}
+        </button>
+      </div>
+
+      {isParseable && blocks.length > 0 ? (
+        <div className="space-y-2">
+          {blocks.map((block, i) => (
+            <div key={i} className={`border rounded-md p-3 ${sceneColors[i % sceneColors.length]}`}>
+              <div className="flex items-center gap-2 mb-1.5">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-foreground/70">{block.label}</span>
+                {block.timing && (
+                  <span className="text-[10px] font-mono text-muted-foreground">({block.timing})</span>
+                )}
+              </div>
+              <p className="text-sm leading-relaxed whitespace-pre-line">{block.content}</p>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <textarea
+          value={raw}
+          readOnly
+          className="w-full min-h-48 text-sm border border-border rounded-md p-3 bg-muted/10 resize-y font-mono leading-relaxed"
+        />
+      )}
+      <p className="text-[10px] text-muted-foreground">{raw.length} characters</p>
+    </div>
+  );
+}
+
 // ── SCREEN RECORDING GENERATOR ─────────────────────────────────────────────────
 
 interface RecordingStep {
@@ -413,6 +566,7 @@ interface RecordingStep {
 function generateRecordingSteps(post: PostPlan): RecordingStep[] {
   const name = post.player_name;
   const hook = getHooks(post)[0] ?? "Open the Neeko rankings";
+  const angle = post.content_angle ?? "";
 
   const baseSteps: RecordingStep[] = [
     {
@@ -459,15 +613,41 @@ function generateRecordingSteps(post: PostPlan): RecordingStep[] {
     },
   ];
 
-  if (post.category === "Trap") {
-    baseSteps[2].action = `Show the trap signal — overpriced vs projection gap for ${name}`;
-    baseSteps[2].zoomPoint = "Price vs projection delta";
-    baseSteps[3].action = `Reveal why ${name} is rated as a TRAP this week — AI summary`;
+  if (angle === "trap_warning" || angle === "overpriced" || post.category === "Trap") {
+    baseSteps[2].action = `Show the trap signal — price vs projection gap for ${name}. Let the gap speak visually.`;
+    baseSteps[2].zoomPoint = "Price vs projection delta — highlight the overvalued number";
+    baseSteps[3].action = `Reveal the TRAP rating for ${name} — show the AI recommendation badge in red`;
+    baseSteps[3].zoomPoint = "Trap/Sell badge + risk rating";
   }
 
-  if (post.category === "Value") {
-    baseSteps[2].action = `Show ${name}'s value score — highlight the underpriced gap`;
-    baseSteps[2].zoomPoint = "Value score vs market price";
+  if (angle === "hidden_edge" || angle === "market_inefficiency" || post.category === "Value") {
+    baseSteps[2].action = `Reveal ${name}'s value score — show the underpriced gap between price and projection`;
+    baseSteps[2].zoomPoint = "Value score number — zoom 2× on the digits";
+    baseSteps[3].action = `Show AI BUY recommendation for ${name} — badge plus first line of summary`;
+    baseSteps[3].zoomPoint = "Buy badge highlighted in green";
+  }
+
+  if (angle === "captain_lock" || angle === "must_have" || post.category === "Captain") {
+    baseSteps[2].action = `Show ${name}'s captain score and projected ceiling — lead with the ceiling number`;
+    baseSteps[2].zoomPoint = "Captain score + ceiling score side-by-side";
+    baseSteps[3].action = `Show the confidence rating for captaining ${name} — AI summary first line`;
+    baseSteps[3].zoomPoint = "Confidence bar + summary callout";
+  }
+
+  if (angle === "comparison" || post.post_type === "Comparison Post") {
+    baseSteps[2].action = `Side-by-side: ${name} vs their closest rival — show projection and value columns`;
+    baseSteps[2].zoomPoint = "Both player rows in rankings table";
+    baseSteps[3].action = `Scroll to ${name}'s AI edge — the stat that separates them`;
+    baseSteps[3].zoomPoint = "Differentiating stat highlighted";
+  }
+
+  if (angle === "breakdown" || post.post_type === "Educational Breakdown") {
+    baseSteps[1].action = `Open the Neeko dashboard — start at the Rankings page overview`;
+    baseSteps[1].pauseSuggestion = "Slow pan across the full table — 3s";
+    baseSteps[2].action = `Filter to ${name}'s position group — show how they rank among peers`;
+    baseSteps[2].zoomPoint = "Position rank badge";
+    baseSteps[3].action = `Open ${name}'s full profile — walk through each data point slowly`;
+    baseSteps[3].zoomPoint = "Projection → Value → Consistency — tap each in sequence";
   }
 
   return baseSteps;
@@ -955,9 +1135,7 @@ function PostDetailPanel({
 
   const isScreenRecording = post.post_type === "Screen Recording";
 
-  const visibleTabs = isScreenRecording
-    ? POST_TABS
-    : POST_TABS.filter((t) => t.id !== "strategy" || true);
+  const visibleTabs = POST_TABS;
 
   const getTabContent = (): string => {
     switch (activeTab) {
@@ -982,7 +1160,7 @@ function PostDetailPanel({
     copy(all, "all");
   };
 
-  const isCustomTab = activeTab === "ai" || activeTab === "platform" || activeTab === "strategy" || (activeTab === "hooks" && isScreenRecording);
+  const isCustomTab = activeTab === "ai" || activeTab === "platform" || activeTab === "strategy" || activeTab === "visual" || (activeTab === "hooks" && isScreenRecording);
 
   return (
     <div className="border border-border rounded-lg overflow-hidden bg-background">
@@ -992,6 +1170,11 @@ function PostDetailPanel({
             {(() => { const Icon = catMeta.icon; return <Icon className="h-3 w-3" />; })()}
             {post.category}
           </span>
+          {post.content_angle && ANGLE_LABELS[post.content_angle] && (
+            <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded border border-border/50 bg-muted/30 ${ANGLE_LABELS[post.content_angle].color}`}>
+              {ANGLE_LABELS[post.content_angle].label}
+            </span>
+          )}
           <span className="text-sm font-semibold">{post.player_name}</span>
           <span className="text-xs text-muted-foreground">{post.team}</span>
         </div>
@@ -1045,7 +1228,9 @@ function PostDetailPanel({
         <PlatformVariantsTabContent post={post} />
       ) : activeTab === "strategy" ? (
         <StrategyTabContent post={post} />
-      ) : activeTab === "hooks" && isScreenRecording ? (
+      ) : activeTab === "visual" ? (
+        <VisualPlanTabContent post={post} />
+      ) : activeTab === "hooks" && (isScreenRecording || post.post_type === "Educational Breakdown" || post.post_type === "Hybrid Video") ? (
         <ScreenRecordingTabContent post={post} />
       ) : (
         <div className="p-4">
@@ -1128,6 +1313,11 @@ function PostCard({
           <TypeIcon className="h-2.5 w-2.5" />
           {post.post_type}
         </span>
+        {post.content_angle && ANGLE_LABELS[post.content_angle] && (
+          <span className={`text-[10px] font-semibold ${ANGLE_LABELS[post.content_angle].color}`}>
+            {ANGLE_LABELS[post.content_angle].label}
+          </span>
+        )}
         {topHookScore !== null && (
           <span className={`text-[10px] font-mono font-bold ${topHookScore >= 8 ? "text-emerald-600" : topHookScore >= 6 ? "text-blue-600" : "text-muted-foreground"}`}>
             {topHookScore}/10
