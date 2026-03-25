@@ -234,6 +234,7 @@ Deno.serve(async (req: Request) => {
       global: {
         headers: {
           Authorization: `Bearer ${serviceKey}`,
+          apikey: serviceKey,
         },
       },
       db: {
