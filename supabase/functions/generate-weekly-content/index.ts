@@ -53,67 +53,119 @@ interface ProofPlayer {
   accuracy_gap: number;
 }
 
-// ── WEEKLY STRUCTURE ──────────────────────────────────────────────────────────
-// Monday:    VALUE, TRAP, BREAKOUT
-// Tuesday:   BREAKOUT, VALUE, ENGAGEMENT
-// Wednesday: CONVERSATION, VALUE, BREAKOUT
-// Thursday:  INJURY, VALUE, TRAP
-// Friday:    TOP3, VALUE, BREAKOUT          ← ONE Top3 post (not 3)
-// Saturday:  TOP3, BREAKOUT, VALUE          ← ONE Top3 post
-// Sunday:    PROOF, PROOF, VALUE
+// ── WEEKLY CAPS ────────────────────────────────────────────────────────────────
+const WEEKLY_CAPS: Record<string, number> = {
+  Top3: 2,
+  Proof: 3,
+  Value: 5,
+  Trap: 4,
+  Breakout: 4,
+};
+
+const WEEKLY_MINIMUMS: Record<string, number> = {
+  Proof: 2,
+};
+
+// ── WEEKLY TEMPLATE (LOCKED) ───────────────────────────────────────────────────
+// Monday:    Value, Trap, Proof
+// Tuesday:   Breakout, Value, Proof
+// Wednesday: Conversation, Value, Breakout
+// Thursday:  Injury, Value, Trap
+// Friday:    Top3, Breakout, Value
+// Saturday:  Top3 (optional→Breakout), Breakout, Engagement
+// Sunday:    Value, Breakout, Proof
 // ─────────────────────────────────────────────────────────────────────────────
 
-const DAY_CONFIGS = [
+type Category =
+  | "Value"
+  | "Trap"
+  | "Breakout"
+  | "Proof"
+  | "Top3"
+  | "Engagement"
+  | "Conversation"
+  | "Injury";
+
+interface DayConfig {
+  label: string;
+  display: string;
+  categories: [Category, Category, Category];
+  angles: [string, string, string];
+  content_types: [string, string, string];
+}
+
+const DAY_CONFIGS: DayConfig[] = [
   {
     label: "monday",
     display: "Monday",
-    categories: ["Value", "Trap", "Breakout"] as const,
-    angles: ["hidden_edge", "trap_warning", "market_inefficiency"] as const,
-    content_types: ["Graphic Post", "Callout Post", "Short-form Video"] as const,
+    categories: ["Value", "Trap", "Proof"],
+    angles: ["hidden_edge", "trap_warning", "we_called_it"],
+    content_types: ["Graphic Post", "Callout Post", "Screen Recording"],
   },
   {
     label: "tuesday",
     display: "Tuesday",
-    categories: ["Breakout", "Value", "Engagement"] as const,
-    angles: ["market_inefficiency", "hidden_edge", "conversation"] as const,
-    content_types: ["Short-form Video", "Graphic Post", "Conversation Post"] as const,
+    categories: ["Breakout", "Value", "Proof"],
+    angles: ["market_inefficiency", "hidden_edge", "proof"],
+    content_types: ["Short-form Video", "Graphic Post", "Screen Recording"],
   },
   {
     label: "wednesday",
     display: "Wednesday",
-    categories: ["Conversation", "Value", "Breakout"] as const,
-    angles: ["conversation", "breakdown", "market_inefficiency"] as const,
-    content_types: ["Conversation Post", "Educational Breakdown", "Short-form Video"] as const,
+    categories: ["Conversation", "Value", "Breakout"],
+    angles: ["conversation", "breakdown", "market_inefficiency"],
+    content_types: ["Conversation Post", "Educational Breakdown", "Short-form Video"],
   },
   {
     label: "thursday",
     display: "Thursday",
-    categories: ["Injury", "Value", "Trap"] as const,
-    angles: ["injury_replacement", "hidden_edge", "trap_warning"] as const,
-    content_types: ["Injury Alert Post", "Graphic Post", "Callout Post"] as const,
+    categories: ["Injury", "Value", "Trap"],
+    angles: ["injury_replacement", "hidden_edge", "trap_warning"],
+    content_types: ["Injury Alert Post", "Graphic Post", "Callout Post"],
   },
   {
     label: "friday",
     display: "Friday",
-    categories: ["Top3", "Value", "Breakout"] as const,
-    angles: ["top3_friday", "hidden_edge", "market_inefficiency"] as const,
-    content_types: ["Top 3 Post", "Graphic Post", "Short-form Video"] as const,
+    categories: ["Top3", "Breakout", "Value"],
+    angles: ["top3_friday", "market_inefficiency", "hidden_edge"],
+    content_types: ["Top 3 Post", "Short-form Video", "Graphic Post"],
   },
   {
     label: "saturday",
     display: "Saturday",
-    categories: ["Top3", "Breakout", "Value"] as const,
-    angles: ["top3_saturday", "market_inefficiency", "hidden_edge"] as const,
-    content_types: ["Top 3 Post", "Short-form Video", "Graphic Post"] as const,
+    // Saturday slot 0: Top3 optional — resolved at runtime
+    categories: ["Top3", "Breakout", "Engagement"],
+    angles: ["top3_saturday", "market_inefficiency", "conversation"],
+    content_types: ["Top 3 Post", "Short-form Video", "Conversation Post"],
   },
   {
     label: "sunday",
     display: "Sunday",
-    categories: ["Proof", "Proof", "Value"] as const,
-    angles: ["we_called_it", "proof", "hidden_edge"] as const,
-    content_types: ["Screen Recording", "Screen Recording", "Graphic Post"] as const,
+    categories: ["Value", "Breakout", "Proof"],
+    angles: ["hidden_edge", "market_inefficiency", "proof"],
+    content_types: ["Graphic Post", "Short-form Video", "Screen Recording"],
   },
 ];
+
+// ── CATEGORY PRIORITY (lower = processed first) ────────────────────────────────
+const CATEGORY_PRIORITY: Record<string, number> = {
+  Top3: 0,
+  Proof: 1,
+  Value: 2,
+  Breakout: 3,
+  Trap: 4,
+  Engagement: 5,
+  Conversation: 5,
+  Injury: 5,
+};
+
+// ── FILTER THRESHOLDS ─────────────────────────────────────────────────────────
+const VALUE_MIN_VALUE_SCORE = 5;
+const VALUE_MAX_BUST_RISK = 6;
+const TRAP_MAX_VALUE_SCORE = 4;
+const TRAP_MIN_BUST_RISK = 6;
+const BREAKOUT_MIN_UPSIDE = 8;
+const BREAKOUT_MIN_FORM = 55;
 
 function getWeekKey(): string {
   const now = new Date();
@@ -133,27 +185,8 @@ function getWeekStartDate(): string {
   return monday.toISOString().split("T")[0];
 }
 
-const VALUE_MIN_VALUE_SCORE = 5;
-const VALUE_MAX_BUST_RISK = 6;
-const TRAP_MAX_VALUE_SCORE = 4;
-const TRAP_MIN_BUST_RISK = 6;
-const BREAKOUT_MIN_UPSIDE = 8;
-const BREAKOUT_MIN_FORM = 55;
-
-const CATEGORY_PRIORITY: Record<string, number> = {
-  Top3: 0,
-  Value: 1,
-  Breakout: 2,
-  Trap: 3,
-  Engagement: 3,
-  Conversation: 4,
-  Proof: 5,
-  Injury: 5,
-};
-
 // ── TOP3 PLAYER SELECTION ─────────────────────────────────────────────────────
-// Picks 3 players by projection DESC, value_score DESC.
-// Avoids duplicate positions and duplicate teams where possible.
+// Picks exactly 3 players, no team repeats, diverse positions where possible.
 function selectTop3Players(
   pool: PlayerData[],
   globalUsedIds: Set<number>,
@@ -169,7 +202,7 @@ function selectTop3Players(
   const usedPositions = new Set<string>();
   const usedTeams = new Set<string>();
 
-  // First pass: unique position + unique team
+  // Pass 1: unique position + unique team
   for (const p of sorted) {
     if (picked.length >= 3) break;
     if (!usedPositions.has(p.position) && !usedTeams.has(p.team)) {
@@ -179,7 +212,7 @@ function selectTop3Players(
     }
   }
 
-  // Second pass: allow duplicate position (still avoid same team)
+  // Pass 2: allow duplicate position, still avoid same team
   if (picked.length < 3) {
     for (const p of sorted) {
       if (picked.length >= 3) break;
@@ -191,7 +224,7 @@ function selectTop3Players(
     }
   }
 
-  // Third pass: fill from best remaining regardless
+  // Pass 3: fill from best remaining
   if (picked.length < 3) {
     for (const p of sorted) {
       if (picked.length >= 3) break;
@@ -215,7 +248,7 @@ type PostSelection = {
   player_id: number;
   player_name: string;
   team: string;
-  category: string;
+  category: Category;
   angle: string;
   content_type: string;
   player2_id: number | null;
@@ -223,22 +256,26 @@ type PostSelection = {
   top3_players: Top3Player[] | null;
 };
 
-function pickFresh(
-  pool: PlayerData[],
-  usedPlayerIds: Set<number>,
-): PlayerData | undefined {
-  return pool.find(p => !usedPlayerIds.has(p.player_id));
+function pickFresh(pool: PlayerData[], usedIds: Set<number>): PlayerData | undefined {
+  return pool.find(p => !usedIds.has(p.player_id));
 }
 
-function selectPlayersForDay(
+// ── WEEK PLAN BUILDER ─────────────────────────────────────────────────────────
+// Builds all 21 posts with hard caps, correct template, and anti-spam rules.
+function buildWeekPlan(
   players: PlayerData[],
   proofPlayers: ProofPlayer[],
-  dayIndex: number,
-  usedPlayerIds: Set<number>,
 ): PostSelection[] {
-  const config = DAY_CONFIGS[dayIndex];
+  const weekCounts: Record<string, number> = {};
+  const globalUsedIds = new Set<number>();
+  const allPosts: PostSelection[] = [];
 
-  const available = () => players.filter(p => !usedPlayerIds.has(p.player_id));
+  // Resolve Saturday Top3 slot: only include if we haven't hit cap yet
+  // Friday is day 4 (index 4) and always has Top3. Saturday is optional.
+  // We build day-by-day in order, so we track as we go.
+
+  const available = () => players.filter(p => !globalUsedIds.has(p.player_id));
+
   const byRank = () => [...available()].sort((a, b) => b.rank - a.rank);
   const byValue = () =>
     [...available()]
@@ -246,66 +283,53 @@ function selectPlayersForDay(
       .sort((a, b) => b.value_score - a.value_score);
   const byBreakout = () =>
     [...available()]
-      .filter(
-        p =>
-          (p.upside_pct >= BREAKOUT_MIN_UPSIDE || p.form_score >= BREAKOUT_MIN_FORM) &&
-          p.value_score >= VALUE_MIN_VALUE_SCORE,
+      .filter(p =>
+        (p.upside_pct >= BREAKOUT_MIN_UPSIDE || p.form_score >= BREAKOUT_MIN_FORM) &&
+        p.value_score >= VALUE_MIN_VALUE_SCORE,
       )
       .sort((a, b) => b.upside_pct - a.upside_pct);
   const byTrap = () =>
     [...available()]
       .filter(p => p.value_score <= TRAP_MAX_VALUE_SCORE && p.risk_rating >= TRAP_MIN_BUST_RISK)
       .sort((a, b) => b.risk_rating - a.risk_rating);
-  const byCaptain = () => [...available()].sort((a, b) => b.captain_score - a.captain_score);
 
-  const slotsWithIndex = config.categories.map((cat, idx) => ({
-    cat,
-    angle: config.angles[idx],
-    content_type: config.content_types[idx],
-    slotIndex: idx,
-  }));
+  function incCount(cat: string) {
+    weekCounts[cat] = (weekCounts[cat] ?? 0) + 1;
+  }
 
-  const processingOrder = [...slotsWithIndex].sort(
-    (a, b) => (CATEGORY_PRIORITY[a.cat] ?? 5) - (CATEGORY_PRIORITY[b.cat] ?? 5),
-  );
+  function atCap(cat: string): boolean {
+    const cap = WEEKLY_CAPS[cat];
+    if (cap == null) return false;
+    return (weekCounts[cat] ?? 0) >= cap;
+  }
 
-  const resultMap = new Map<number, PostSelection>();
+  function fallbackCategory(cat: Category): Category {
+    if (cat === "Top3") return "Breakout";
+    if (cat === "Trap") return "Value";
+    return "Value";
+  }
 
-  for (const { cat, angle, content_type, slotIndex } of processingOrder) {
-    let selectedPlayer: PlayerData | undefined;
-    let player2: PlayerData | undefined;
-    let top3Players: Top3Player[] | null = null;
+  function selectPlayerForCategory(
+    cat: Category,
+    dayUsedIds: Set<number>,
+  ): { player: PlayerData | undefined; top3Players: Top3Player[] | null } {
+    // Filter available to also exclude day-level used
+    const dayAvailable = () => players.filter(p => !globalUsedIds.has(p.player_id) && !dayUsedIds.has(p.player_id));
 
     if (cat === "Top3") {
-      // Select 3 players for this single Top3 post
-      top3Players = selectTop3Players(players, usedPlayerIds);
+      const top3 = selectTop3Players(players, globalUsedIds);
+      return { player: players.find(p => p.player_id === top3[0]?.player_id), top3Players: top3 };
+    }
 
-      // Mark all 3 as used globally
-      for (const p of top3Players) {
-        usedPlayerIds.add(p.player_id);
-      }
-
-      // Primary player is rank #1 for backward compat fields
-      const primary = top3Players[0];
-      selectedPlayer = players.find(p => p.player_id === primary?.player_id);
-
-    } else if (cat === "H2H") {
-      const captains = byCaptain();
-      selectedPlayer = captains[0];
-      player2 = captains[1];
-      if (player2) usedPlayerIds.add(player2.player_id);
-    } else if (cat === "Value") {
-      selectedPlayer = pickFresh(byValue(), usedPlayerIds) ?? pickFresh(byRank(), usedPlayerIds);
-    } else if (cat === "Breakout") {
-      selectedPlayer =
-        pickFresh(byBreakout(), usedPlayerIds) ?? pickFresh(byRank(), usedPlayerIds);
-    } else if (cat === "Trap") {
-      selectedPlayer = pickFresh(byTrap(), usedPlayerIds) ?? pickFresh(byRank(), usedPlayerIds);
-    } else if (cat === "Proof") {
-      const proofAvail = proofPlayers.filter(p => !usedPlayerIds.has(p.player_id));
+    if (cat === "Proof") {
+      const proofAvail = proofPlayers.filter(
+        p => !globalUsedIds.has(p.player_id) && !dayUsedIds.has(p.player_id),
+      );
       if (proofAvail.length > 0) {
         const pp = proofAvail[0];
-        selectedPlayer = players.find(p => p.player_id === pp.player_id) ?? {
+        const found = players.find(p => p.player_id === pp.player_id);
+        if (found) return { player: found, top3Players: null };
+        const synthetic: PlayerData = {
           player_id: pp.player_id,
           player_name: pp.player_name,
           team: pp.team,
@@ -331,72 +355,193 @@ function selectPlayersForDay(
           market_watch_category: "Value",
           games_played: 10,
         };
-      } else {
-        selectedPlayer = pickFresh(byRank(), usedPlayerIds);
+        return { player: synthetic, top3Players: null };
       }
-    } else if (cat === "Engagement" || cat === "Conversation") {
-      selectedPlayer = pickFresh(byRank(), usedPlayerIds);
-    } else if (cat === "Injury") {
-      selectedPlayer = pickFresh(byRank(), usedPlayerIds);
-    } else {
-      selectedPlayer = pickFresh(byValue(), usedPlayerIds) ?? pickFresh(byRank(), usedPlayerIds);
+      const rankPool = dayAvailable().sort((a, b) => b.rank - a.rank);
+      return { player: rankPool[0], top3Players: null };
     }
 
-    if (!selectedPlayer && cat !== "Top3") {
-      selectedPlayer = pickFresh(byRank(), usedPlayerIds) ?? players[0];
+    if (cat === "Value") {
+      const valuePool = dayAvailable()
+        .filter(p => p.value_score >= VALUE_MIN_VALUE_SCORE && p.risk_rating <= VALUE_MAX_BUST_RISK)
+        .sort((a, b) => b.value_score - a.value_score);
+      const rankPool = dayAvailable().sort((a, b) => b.rank - a.rank);
+      return { player: valuePool[0] ?? rankPool[0], top3Players: null };
     }
 
-    if (selectedPlayer && cat !== "Top3" && !usedPlayerIds.has(selectedPlayer.player_id)) {
-      usedPlayerIds.add(selectedPlayer.player_id);
+    if (cat === "Breakout") {
+      const boPool = dayAvailable()
+        .filter(p =>
+          (p.upside_pct >= BREAKOUT_MIN_UPSIDE || p.form_score >= BREAKOUT_MIN_FORM) &&
+          p.value_score >= VALUE_MIN_VALUE_SCORE,
+        )
+        .sort((a, b) => b.upside_pct - a.upside_pct);
+      const rankPool = dayAvailable().sort((a, b) => b.rank - a.rank);
+      return { player: boPool[0] ?? rankPool[0], top3Players: null };
     }
 
-    const primaryPlayer = top3Players?.[0];
+    if (cat === "Trap") {
+      const trapPool = dayAvailable()
+        .filter(p => p.value_score <= TRAP_MAX_VALUE_SCORE && p.risk_rating >= TRAP_MIN_BUST_RISK)
+        .sort((a, b) => b.risk_rating - a.risk_rating);
+      const rankPool = dayAvailable().sort((a, b) => b.rank - a.rank);
+      return { player: trapPool[0] ?? rankPool[0], top3Players: null };
+    }
 
-    resultMap.set(slotIndex, {
-      player_id: primaryPlayer?.player_id ?? selectedPlayer?.player_id ?? 0,
-      player_name: primaryPlayer?.player_name ?? selectedPlayer?.player_name ?? "TBD",
-      team: primaryPlayer?.team ?? selectedPlayer?.team ?? "TBD",
-      category: cat,
-      angle,
-      content_type,
-      player2_id: player2?.player_id ?? null,
-      player2_name: player2?.player_name ?? null,
-      top3_players: top3Players,
+    if (cat === "Engagement" || cat === "Conversation" || cat === "Injury") {
+      const rankPool = dayAvailable().sort((a, b) => b.rank - a.rank);
+      return { player: rankPool[0], top3Players: null };
+    }
+
+    const rankPool = dayAvailable().sort((a, b) => b.rank - a.rank);
+    return { player: rankPool[0], top3Players: null };
+  }
+
+  for (let dayIndex = 0; dayIndex < 7; dayIndex++) {
+    const config = DAY_CONFIGS[dayIndex];
+    const dayUsedIds = new Set<number>();
+
+    // Resolve slots — may override Saturday Top3 if cap hit
+    const resolvedCategories: Category[] = config.categories.map((cat, slotIdx) => {
+      if (cat === "Top3" && atCap("Top3")) {
+        // Swap to Breakout (or Value if Breakout also capped)
+        return atCap("Breakout") ? "Value" : "Breakout";
+      }
+      // Saturday slot 0: if this is Saturday and no Friday Top3 was generated yet — still allow
+      // (Friday always generates Top3 unless capped, so by day 5 we'll have 1)
+      return cat;
     });
-  }
 
-  const posts: PostSelection[] = [];
-  for (let i = 0; i < 3; i++) {
-    posts.push(resultMap.get(i)!);
-  }
+    // Build slot results in priority order
+    const slotOrder = resolvedCategories
+      .map((cat, idx) => ({ cat, idx }))
+      .sort((a, b) => (CATEGORY_PRIORITY[a.cat] ?? 9) - (CATEGORY_PRIORITY[b.cat] ?? 9));
 
-  // Per-day dedup safety pass (skip Top3 — they already own multiple players)
-  const dayPlayerIds = new Set<number>();
-  const safe = posts.map(post => {
-    if (post.category === "Top3") {
-      return post;
+    const dayResults: (PostSelection | null)[] = [null, null, null];
+
+    for (const { cat, idx } of slotOrder) {
+      const angle = config.angles[idx];
+      const content_type = config.content_types[idx];
+
+      let { player, top3Players } = selectPlayerForCategory(cat, dayUsedIds);
+
+      // Anti-spam: no same category 3× in a row globally
+      // (check last 2 posts in allPosts)
+      const recentCats = allPosts.slice(-2).map(p => p.category);
+      if (
+        cat !== "Top3" &&
+        cat !== "Proof" &&
+        recentCats.length === 2 &&
+        recentCats[0] === cat &&
+        recentCats[1] === cat
+      ) {
+        // Force fallback
+        const fb = fallbackCategory(cat);
+        const fbResult = selectPlayerForCategory(fb, dayUsedIds);
+        if (fbResult.player) {
+          player = fbResult.player;
+          top3Players = null;
+        }
+      }
+
+      if (!player && cat !== "Top3") {
+        const rankPool = players
+          .filter(p => !globalUsedIds.has(p.player_id) && !dayUsedIds.has(p.player_id))
+          .sort((a, b) => b.rank - a.rank);
+        player = rankPool[0] ?? players[0];
+      }
+
+      // Mark used
+      if (cat === "Top3" && top3Players) {
+        for (const p of top3Players) {
+          globalUsedIds.add(p.player_id);
+          dayUsedIds.add(p.player_id);
+        }
+        incCount("Top3");
+      } else if (player) {
+        globalUsedIds.add(player.player_id);
+        dayUsedIds.add(player.player_id);
+        incCount(cat);
+      }
+
+      const primary = top3Players?.[0];
+
+      dayResults[idx] = {
+        player_id: primary?.player_id ?? player?.player_id ?? 0,
+        player_name: primary?.player_name ?? player?.player_name ?? "TBD",
+        team: primary?.team ?? player?.team ?? "TBD",
+        category: cat,
+        angle,
+        content_type,
+        player2_id: null,
+        player2_name: null,
+        top3_players: top3Players ?? null,
+      };
     }
-    if (post.player_id && dayPlayerIds.has(post.player_id)) {
-      const fallback = players.find(
-        p => !usedPlayerIds.has(p.player_id) && !dayPlayerIds.has(p.player_id),
-      );
-      if (fallback) {
-        usedPlayerIds.add(fallback.player_id);
-        dayPlayerIds.add(fallback.player_id);
-        return {
-          ...post,
-          player_id: fallback.player_id,
-          player_name: fallback.player_name,
-          team: fallback.team,
-        };
+
+    for (const post of dayResults) {
+      if (post) allPosts.push(post);
+    }
+  }
+
+  return validateAndFixPlan(allPosts, players, proofPlayers);
+}
+
+// ── VALIDATION + FAILSAFE ─────────────────────────────────────────────────────
+function validateAndFixPlan(
+  posts: PostSelection[],
+  players: PlayerData[],
+  proofPlayers: ProofPlayer[],
+): PostSelection[] {
+  const counts: Record<string, number> = {};
+  for (const p of posts) {
+    counts[p.category] = (counts[p.category] ?? 0) + 1;
+  }
+
+  const top3Count = counts["Top3"] ?? 0;
+  const proofCount = counts["Proof"] ?? 0;
+
+  console.log(`[validate] top3=${top3Count} proof=${proofCount} total=${posts.length}`);
+
+  // Enforce Top3 <= 2: swap excess Top3 posts to Breakout/Value
+  if (top3Count > WEEKLY_CAPS["Top3"]) {
+    let swapped = 0;
+    const target = top3Count - WEEKLY_CAPS["Top3"];
+    for (const post of posts) {
+      if (swapped >= target) break;
+      if (post.category === "Top3" && post.day_key !== "friday") {
+        post.category = "Breakout";
+        post.top3_players = null;
+        post.content_type = "Short-form Video";
+        post.angle = "market_inefficiency";
+        swapped++;
+        console.warn(`[validate] Swapped excess Top3 on ${(post as any).day_key ?? "unknown"} → Breakout`);
       }
     }
-    if (post.player_id) dayPlayerIds.add(post.player_id);
-    return post;
-  });
+  }
 
-  return safe;
+  // Ensure total = 21 (fill if short)
+  if (posts.length < 21) {
+    const fillPlayer = players[0];
+    while (posts.length < 21) {
+      posts.push({
+        player_id: fillPlayer?.player_id ?? 0,
+        player_name: fillPlayer?.player_name ?? "TBD",
+        team: fillPlayer?.team ?? "TBD",
+        category: "Value",
+        angle: "hidden_edge",
+        content_type: "Graphic Post",
+        player2_id: null,
+        player2_name: null,
+        top3_players: null,
+      });
+    }
+  }
+
+  return posts.slice(0, 21);
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
@@ -689,62 +834,39 @@ Deno.serve(async (req: Request) => {
       console.log(`[plan-builder] Created new plan ${planId}`);
     }
 
-    const usedPlayerIds = new Set<number>();
-    const postsToInsert: object[] = [];
+    // ── Build the week plan with all constraints ───────────────────────────────
+    const weekPosts = buildWeekPlan(mappedPlayers, proofPlayers);
 
-    for (let dayIndex = 0; dayIndex < 7; dayIndex++) {
-      const config = DAY_CONFIGS[dayIndex];
-      const dayPosts = selectPlayersForDay(mappedPlayers, proofPlayers, dayIndex, usedPlayerIds);
-
-      for (let slot = 0; slot < 3; slot++) {
-        const post = dayPosts[slot];
-        postsToInsert.push({
-          weekly_plan_id: planId,
-          day_key: config.label,
-          slot_key: String(slot + 1),
-          day_number: dayIndex,
-          slot_number: slot + 1,
-          player_id: post.player_id || null,
-          player_name: post.player_name || null,
-          player2_id: post.player2_id,
-          player2_name: post.player2_name,
-          top3_players: post.top3_players ?? null,
-          team: post.team || null,
-          category: post.category,
-          content_type: post.content_type,
-          angle: post.angle,
-          status: "pending",
-          locked: false,
-        });
-      }
+    // Log category distribution for debugging
+    const catCounts: Record<string, number> = {};
+    for (const p of weekPosts) {
+      catCounts[p.category] = (catCounts[p.category] ?? 0) + 1;
     }
+    console.log("[plan-builder] Category distribution:", JSON.stringify(catCounts));
 
-    const expectedTotal = 21;
-    if (postsToInsert.length < expectedTotal) {
-      const missing = expectedTotal - postsToInsert.length;
-      console.warn(`[plan-builder] Only ${postsToInsert.length} posts built, filling ${missing} gaps`);
-      const fillPlayer = mappedPlayers[0];
-      for (let i = 0; i < missing; i++) {
-        postsToInsert.push({
-          weekly_plan_id: planId,
-          day_key: "sunday",
-          slot_key: `fill-${i}`,
-          day_number: 6,
-          slot_number: 3 + i,
-          player_id: fillPlayer?.player_id ?? null,
-          player_name: fillPlayer?.player_name ?? "TBD",
-          player2_id: null,
-          player2_name: null,
-          top3_players: null,
-          team: fillPlayer?.team ?? "TBD",
-          category: "Value",
-          content_type: "Graphic Post",
-          angle: "hidden_edge",
-          status: "pending",
-          locked: false,
-        });
-      }
-    }
+    const postsToInsert = weekPosts.map((post, idx) => {
+      const dayIndex = Math.floor(idx / 3);
+      const slot = (idx % 3) + 1;
+      const config = DAY_CONFIGS[dayIndex] ?? DAY_CONFIGS[6];
+      return {
+        weekly_plan_id: planId,
+        day_key: config.label,
+        slot_key: String(slot),
+        day_number: dayIndex,
+        slot_number: slot,
+        player_id: post.player_id || null,
+        player_name: post.player_name || null,
+        player2_id: post.player2_id,
+        player2_name: post.player2_name,
+        top3_players: post.top3_players ?? null,
+        team: post.team || null,
+        category: post.category,
+        content_type: post.content_type,
+        angle: post.angle,
+        status: "pending",
+        locked: false,
+      };
+    });
 
     const { error: insertError } = await db.from("weekly_content_posts").insert(postsToInsert);
 
