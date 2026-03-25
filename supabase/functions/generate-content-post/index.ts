@@ -432,31 +432,36 @@ CAPTION RULES:
 - 3-4 punchy lines. Line 1: Bold opinion. Lines 2-3: Two specific data points. Final line: CTA + 3-4 hashtags.
 
 VISUAL PLAN RULES — THIS IS THE MOST IMPORTANT FIELD:
-- For Video/Short-form Video/Hybrid Video: Scene-by-scene. Each scene: timing, exact text overlay, animation style, colour logic.
-- For Graphic Post/Callout Post: Layout brief. Specify: zones, exact headline text, player image placement, background, colour scheme.
-- For Screen Recording: Step-by-step. Specify: which page to open, where to scroll, what to highlight, cursor speed, pause timing.
-- For Comparison Post/H2H Post: Two columns, stat rows, which column wins each (green/red), final verdict overlay.
-- For Top 3 Post: Stack layout. Three rows with rank indicators. Gold/Silver/Bronze.
-- For Injury Alert Post: Red banner, injured player struck through, three replacement rows in green.
+- Describe REAL imagery and footage — not abstract design concepts.
+- NEVER use: "graphic design", "player image", "clean layout", "generic background".
+- For Video/Short-form Video/Hybrid Video: Scene-by-scene with REAL footage types per scene. Specify: what real clip is playing (goal, tackle, clearance, celebration), exact text overlay, timing, transition style.
+- For Graphic Post/Callout Post: Specify exact image type (in-game action shot, media day portrait, broadcast still), what the player is doing, composition (close-up/mid-shot), overlay elements (projection, price, rank badge), colour treatment.
+- For Screen Recording: Step-by-step Neeko UI walkthrough — which page, what to scroll to, what to highlight.
+- For Comparison Post/H2H Post: Split-screen with real action shots of each player, stat rows, clear winner verdict overlay.
+- For Top 3 Post: Three rows, each with in-game action shot of the respective player, gold/silver/bronze rank badge, projection overlay.
+- For Injury Alert Post: Red BREAKING banner, injured player reference, three replacement rows each with a real moment description.
+- Category visual rules: VALUE — consistency gameplay + stat overlay. BREAKOUT — explosive highlight moment (goal, big score, burst). TRAP — neutral/poor performance clip with warning overlay. PROOF — scoreboard overlay or real past game reference. CAPTAIN — decisive match moment, high-intensity action.
 - Colour logic: GREEN (#00C853) = value/buy/captain. RED (#D32F2F) = trap/sell/injury. AMBER (#FF8F00) = risk/neutral. GOLD (#FFD700) for #1 rank.
-- Must be a single detailed STRING. Specific enough that a designer could execute it without questions.
+- Must be a single detailed STRING specific enough that an editor can execute without guessing.
 
 IMAGE PROMPT RULES (ai_image_prompt field):
-- Write an ultra-high-end Midjourney/DALL-E/Ideogram image brief that a professional creative director would approve.
-- Style: "Ultra-realistic sports editorial" OR "ESPN/Fox Sports graphic design" — pick the one that fits.
-- Structure: "Style: [descriptor]. Subject: [player name], [pose/action], [jersey/team colours]. Camera: [angle — low angle, eye-level, overhead]. Lighting: [stadium lighting/dramatic rim light/cinematic contrast]. Composition: [rule of thirds/hero centre/split-screen]. Background: [MCG/stadium crowd blur/dark gradient]. Details: [specific jersey, motion blur, sweat, intensity]. Text overlay: [exact bold headline words — max 5 words]. Stats bar: [$price, projection Xpts, value score]. Colour palette: dark #0D0D0D background, team primary colour, green accent #00C853. Mood: [urgent/analytical/dramatic/celebratory]. Brand: Neeko Sports logo bottom-right, white on dark."
-- Player name and team must appear in the prompt.
-- Under 130 words. Every field filled — no vague descriptors.
+- Describe a REAL-WORLD image type — not an abstract graphic.
+- MANDATORY: specify one image type from: "real in-game action shot", "player media day portrait", "match broadcast still", "celebration moment", "training session shot".
+- Structure: "Image type: [type]. Player: [player name] ([team]), [exact action — e.g. kicking inside 50, handballing through traffic, celebrating goal with teammates]. Source style: [AFL broadcast / Getty-style sports photography / Fox Footy broadcast frame]. Shot: [close-up / mid-shot / wide]. Composition: [player position in frame], background [crowd/stadium/bench]. Overlay: [projection Xpts], [$price], [rank badge if relevant], headline text '[MAX 5 WORDS]'. Colour treatment: dark #0D0D0D vignette, team primary accent, #00C853 stat highlights. Brand: Neeko Sports logo bottom-right, white."
+- Player name and team must appear.
+- Under 120 words. Every field filled. No vague descriptors.
 
 VIDEO PROMPT RULES (ai_video_prompt field):
-- Write a production-grade Runway/Sora/Kling video brief — as if briefing a motion graphics studio.
-- Three mandatory scenes:
-  Scene 1 (0-4s): Hook visual — [exact text animating in], [camera movement], [colour flash or zoom], [sound note].
-  Scene 2 (4-14s): Data reveal — [stats appearing one by one], [player image/graphic], [specific numbers from player data], [animation style — slide-in/fade/count-up].
-  Scene 3 (14-20s): CTA end card — [Neeko Sports branding], [green #00C853 accent flash], [bold CTA text], [fade to logo].
-- Specify: camera movement per scene, text overlay exact words, transition style between scenes.
+- Describe REAL footage types per scene — not motion graphics alone.
+- MANDATORY: every scene must reference a real AFL footage type (highlight clip, broadcast angle, slow-motion replay, goal celebration, midfield contest).
+- Four mandatory scenes:
+  Scene 1 (0-3s): Hook — fast highlight clip of player (specify: what play — goal / clearance / big score game), headline text overlay slams in, hard cut beat.
+  Scene 2 (3-10s): Context — broadcast gameplay clip OR stat overlay animation on dark background, specific numbers count up (projection, price, value score).
+  Scene 3 (10-16s): Insight — second gameplay moment of player OR slow-motion replay of key play, supporting stat or AI verdict text fades in.
+  Scene 4 (16-22s): CTA — Neeko Sports logo pulses in green #00C853, bold white CTA text, simple motion, fade to black.
+- Specify: footage type per scene, exact text overlay words, transition style between scenes.
 - Neeko branding throughout: dark background, green #00C853 accent, bold white typography.
-- Under 160 words. Scene timings must add to 15-25 seconds total.
+- Under 180 words. Scene timings must total 18-25 seconds.
 
 CREATIVE STYLE — assign one per post from this exact list:
 - pov_stadium: first-person stadium perspective, creates immersion
@@ -587,8 +592,8 @@ OUTPUT FORMAT (strict JSON, no markdown):
   "voice_script": "55-80 word voice script with specific numbers",
   "caption_script": "3-4 line caption with specific numbers and hashtags",
   "visual_plan": "Detailed production brief scene-by-scene or layout brief",
-  "ai_image_prompt": "Style: ESPN sports editorial. Subject: [player name], [team jersey], explosive action pose. Camera: low angle. Lighting: dramatic stadium rim light. Composition: hero centre. Background: stadium crowd blur. Details: jersey number, motion blur. Text overlay: [MAX 5 WORDS]. Stats bar: [$price, projectionpts]. Colour palette: dark #0D0D0D, team primary, #00C853. Mood: urgent. Brand: Neeko Sports bottom-right.",
-  "ai_video_prompt": "Scene 1 (0-4s): Text '[HOOK]' slams into frame on dark background, green #00C853 flash, quick zoom. Scene 2 (4-14s): Stats count up one by one — projection, price, value score — player graphic slides in from right. Scene 3 (14-20s): CTA end card — Neeko Sports logo pulses in green, text 'Link in bio' bold white. Fade to black.",
+  "ai_image_prompt": "Image type: real in-game action shot. Player: [player name] ([team]), [exact action — e.g. kicking inside 50 during AFL match, handballing through traffic]. Source style: AFL broadcast / Getty-style sports photography. Shot: mid-shot. Composition: player hero centre-frame, stadium crowd background blur. Overlay: projection [X]pts, $[price]k, headline '[MAX 5 WORDS]'. Colour treatment: dark #0D0D0D vignette, team primary accent, #00C853 stat highlights. Brand: Neeko Sports logo bottom-right, white.",
+  "ai_video_prompt": "Scene 1 (0-3s): Fast highlight clip — [player name] [specific play e.g. kicking a goal / winning clearance], headline text '[HOOK]' slams in bold white, hard cut. Scene 2 (3-10s): Broadcast gameplay clip of player in action, stats count up — projection [X]pts, $[price]k, value score — dark background overlay. Scene 3 (10-16s): Slow-motion replay of key play OR second gameplay moment, AI verdict text fades in. Scene 4 (16-22s): Neeko Sports logo pulses in green #00C853, bold white CTA 'Full breakdown — link in bio', fade to black.",
   "strategy_json": {
     "goal": "primary goal of this post",
     "trigger": "psychological trigger being used",
@@ -708,8 +713,8 @@ OUTPUT FORMAT (strict JSON, no markdown):
   "voice_script": "EXACT FORMAT AS SPECIFIED ABOVE — must include #1 #2 #3 headers with Projection, Ceiling, Why per player",
   "caption_script": "Multi-line caption naming all 3 players with their projections and CTA",
   "visual_plan": "Stack layout — dark #0D0D0D background. Row 1: GOLD badge #1 + ${p1.player_name} (${p1.team}) + ${Math.round(p1.projection)}pts projection. Row 2: SILVER badge #2 + ${p2.player_name} (${p2.team}) + ${Math.round(p2.projection)}pts projection. Row 3: BRONZE badge #3 + ${p3.player_name} (${p3.team}) + ${Math.round(p3.projection)}pts projection. Header: 'TOP 3 PICKS THIS ROUND' in bold white. Green #00C853 accent dividers. Neeko Sports logo bottom-right.",
-  "ai_image_prompt": "Style: ESPN Fox Sports graphic design. Subject: Top 3 AFL Fantasy picks this round — three stacked rank cards. Layout: dark #0D0D0D background with gold/silver/bronze rank indicators. Row 1 GOLD: ${p1.player_name} (${p1.team}) ${Math.round(p1.projection)}pts. Row 2 SILVER: ${p2.player_name} (${p2.team}) ${Math.round(p2.projection)}pts. Row 3 BRONZE: ${p3.player_name} (${p3.team}) ${Math.round(p3.projection)}pts. Text overlay: 'TOP 3 THIS ROUND'. Colour palette: #0D0D0D, #FFD700 gold, #C0C0C0 silver, #CD7F32 bronze, #00C853 green accents. Mood: authoritative. Brand: Neeko Sports logo bottom-right white.",
-  "ai_video_prompt": "Scene 1 (0-4s): 'TOP 3 PICKS THIS ROUND' slams into frame on dark background, gold flash, hard zoom in. Scene 2 (4-16s): Ranked cards reveal one by one — #1 gold card slides in with ${p1.player_name} + ${Math.round(p1.projection)}pts, then #2 silver + ${p2.player_name} + ${Math.round(p2.projection)}pts, then #3 bronze + ${p3.player_name} + ${Math.round(p3.projection)}pts, each with count-up animation. Scene 3 (16-22s): All 3 cards visible together — green #00C853 flash, Neeko Sports logo pulses in, 'Full breakdown — link in bio' bold white. Fade to black.",
+  "ai_image_prompt": "Image type: match broadcast stills composite. Players: #1 ${p1.player_name} (${p1.team}) — in-game action shot; #2 ${p2.player_name} (${p2.team}) — broadcast still; #3 ${p3.player_name} (${p3.team}) — gameplay moment. Source style: AFL broadcast / Getty-style sports photography. Shot: three stacked mid-shots in ranked layout. Composition: gold/silver/bronze rank badge left, player hero centre, stat right — dark #0D0D0D background. Overlay: #1 projection ${Math.round(p1.projection)}pts, #2 ${Math.round(p2.projection)}pts, #3 ${Math.round(p3.projection)}pts, headline 'TOP 3 THIS ROUND'. Colour treatment: dark #0D0D0D vignette, #FFD700 gold / #C0C0C0 silver / #CD7F32 bronze accents, #00C853 stat highlights. Brand: Neeko Sports logo bottom-right, white.",
+  "ai_video_prompt": "Scene 1 (0-3s): Fast highlight clip — ${p1.player_name} explosive play (goal / clearance / disposal), headline 'TOP 3 PICKS THIS ROUND' slams in bold white with gold flash, hard cut. Scene 2 (3-12s): Broadcast gameplay clips reveal ranked picks one by one — #1 ${p1.player_name} clip + ${Math.round(p1.projection)}pts count-up, #2 ${p2.player_name} clip + ${Math.round(p2.projection)}pts, #3 ${p3.player_name} clip + ${Math.round(p3.projection)}pts, each with gold/silver/bronze badge slide-in. Scene 3 (12-18s): All 3 players shown together via in-game stills, projection totals locked in, 'Save this before lockout' text fades in. Scene 4 (18-22s): Neeko Sports logo pulses in green #00C853, bold white CTA 'Full breakdown — link in bio', fade to black.",
   "strategy_json": {
     "goal": "Drive saves and profile visits via definitive weekly ranked list",
     "trigger": "FOMO and authority",
