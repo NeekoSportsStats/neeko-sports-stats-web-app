@@ -1,4 +1,5 @@
 import type { PlayerOption, MappingRow } from "./types";
+import type { PersistedMapping } from "./usePriceIngest";
 
 export type MatchStatus =
   | "auto_matched"
@@ -23,6 +24,10 @@ function normalizeName(raw: string): string {
     .replace(/[^A-Z0-9\s]/g, "")
     .replace(/\s+/g, " ")
     .trim();
+}
+
+function normalizeForLookup(raw: string): string {
+  return raw.toLowerCase().trim().replace(/[^a-z0-9\s]/g, "").replace(/\s+/g, " ");
 }
 
 interface ParsedName {
@@ -69,7 +74,36 @@ function getPlayerNameMap(players: PlayerOption[]): Map<number, ParsedPlayerName
   return map;
 }
 
-export function matchPlayer(sourceName: string, players: PlayerOption[]): MatchResult {
+export function buildMappingIndex(mappings: PersistedMapping[]): Map<string, PersistedMapping> {
+  const index = new Map<string, PersistedMapping>();
+  for (const m of mappings) {
+    index.set(normalizeForLookup(m.source_name), m);
+  }
+  return index;
+}
+
+export function matchPlayer(
+  sourceName: string,
+  players: PlayerOption[],
+  persistedMappings?: Map<string, PersistedMapping>,
+): MatchResult {
+  if (persistedMappings && persistedMappings.size > 0) {
+    const key = normalizeForLookup(sourceName);
+    const hit = persistedMappings.get(key);
+    if (hit) {
+      const player = players.find(p => p.player_id === hit.player_id);
+      if (player) {
+        return {
+          status: "auto_matched",
+          confidence: 100,
+          player_id: hit.player_id,
+          player_name: hit.player_name,
+          suggestions: [],
+        };
+      }
+    }
+  }
+
   const parsed = parseName(sourceName);
 
   if (!parsed) {
@@ -99,7 +133,7 @@ export function matchPlayer(sourceName: string, players: PlayerOption[]): MatchR
   if (exactBoth.length === 1) {
     return {
       status: "auto_matched",
-      confidence: 97,
+      confidence: 95,
       player_id: exactBoth[0].player_id,
       player_name: exactBoth[0].player_name,
       suggestions: [],
@@ -110,7 +144,11 @@ export function matchPlayer(sourceName: string, players: PlayerOption[]): MatchR
     return { status: "suggested", confidence: 75, player_id: null, player_name: null, suggestions: exactBoth.slice(0, 6) };
   }
 
-  if (exactSurnameOnly.length >= 1) {
+  if (exactSurnameOnly.length === 1) {
+    return { status: "suggested", confidence: 80, player_id: null, player_name: null, suggestions: exactSurnameOnly };
+  }
+
+  if (exactSurnameOnly.length > 1) {
     return { status: "suggested", confidence: 60, player_id: null, player_name: null, suggestions: exactSurnameOnly.slice(0, 6) };
   }
 
@@ -136,11 +174,15 @@ export function matchPlayer(sourceName: string, players: PlayerOption[]): MatchR
   return { status: "pending_player_record", confidence: 0, player_id: null, player_name: null, suggestions: [] };
 }
 
-export function applyAutoMatch(rows: MappingRow[], players: PlayerOption[]): MappingRow[] {
+export function applyAutoMatch(
+  rows: MappingRow[],
+  players: PlayerOption[],
+  persistedMappings?: Map<string, PersistedMapping>,
+): MappingRow[] {
   return rows.map(row => {
     if (row.match_status === "manual_input") return row;
 
-    const result = matchPlayer(row.source_name, players);
+    const result = matchPlayer(row.source_name, players, persistedMappings);
 
     if (result.status === "auto_matched") {
       return {

@@ -1,4 +1,4 @@
-import { useState, useRef, useMemo, useCallback } from "react";
+import { useState, useRef, useMemo, useCallback, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Upload, FileText, RefreshCw, CircleCheck as CheckCircle,
@@ -7,10 +7,10 @@ import {
   Sparkles, Braces, Lock,
 } from "lucide-react";
 import { parseCSVText, parseCSVFile, parseRawFantasyText, parseJsonPlayersText, isJsonInput, fmtPrice, type ParseError } from "./parseUtils";
-import { usePlayerOptions, useCommitPrices, useSavePending, usePriceRounds } from "./usePriceIngest";
+import { usePlayerOptions, useCommitPrices, useSavePending, usePriceRounds, useSaveMapping, lookupPersistedMappings, type PersistedMapping } from "./usePriceIngest";
 import { RoundSelector } from "./RoundSelector";
 import { PlayerSearchDropdown } from "./PlayerSearchDropdown";
-import { applyAutoMatch } from "./matchEngine";
+import { applyAutoMatch, buildMappingIndex } from "./matchEngine";
 import type { ParsedPriceRow, MappingRow, IngestByIdResult, MatchStatus } from "./types";
 
 type Step = "input" | "mapping" | "done";
@@ -110,7 +110,17 @@ export function FantasyPricesTab() {
   const players = usePlayerOptions();
   const { committing, commitPrices } = useCommitPrices();
   const { saving, savePending } = useSavePending();
+  const { saveMapping } = useSaveMapping();
   const { rounds, loading: roundsLoading, fetchRounds, toggleLock } = usePriceRounds(CURRENT_SEASON);
+  const [persistedMappings, setPersistedMappings] = useState<Map<string, PersistedMapping>>(new Map());
+
+  useEffect(() => {
+    if (mappingRows.length === 0) return;
+    const sourceNames = mappingRows.map(r => r.source_name);
+    lookupPersistedMappings(sourceNames).then(results => {
+      setPersistedMappings(buildMappingIndex(results));
+    });
+  }, [mappingRows.length]);
 
   function buildMappingRows(parsed: ParsedPriceRow[]): MappingRow[] {
     const raw: MappingRow[] = parsed.map(r => ({
@@ -136,7 +146,7 @@ export function FantasyPricesTab() {
     }));
 
     if (players.length > 0) {
-      return sortAndGroupRows(applyAutoMatch(raw, players));
+      return sortAndGroupRows(applyAutoMatch(raw, players, persistedMappings.size > 0 ? persistedMappings : undefined));
     }
     return sortAndGroupRows(raw);
   }
@@ -179,8 +189,8 @@ export function FantasyPricesTab() {
   }
 
   const handlePlayerSelect = useCallback((rowId: string, playerId: number | null, playerName: string | null, isManualInput?: boolean) => {
-    setMappingRows(prev =>
-      prev.map(r => {
+    setMappingRows(prev => {
+      const updatedRows = prev.map(r => {
         if (r.id !== rowId) return r;
         if (isManualInput) {
           return {
@@ -198,9 +208,18 @@ export function FantasyPricesTab() {
           manual_input_name: null,
           match_status: playerId !== null ? "manually_matched" : r.match_status,
         };
-      })
-    );
-  }, []);
+      });
+
+      if (!isManualInput && playerId !== null && playerName !== null) {
+        const row = prev.find(r => r.id === rowId);
+        if (row) {
+          saveMapping(row.source_name, playerId);
+        }
+      }
+
+      return updatedRows;
+    });
+  }, [saveMapping]);
 
   const roundMeta = rounds.find(r => r.round === selectedRound && r.season === CURRENT_SEASON);
   const isRoundLocked = roundMeta?.is_locked ?? false;
@@ -266,7 +285,7 @@ export function FantasyPricesTab() {
         confidence: 0,
         suggestions: [],
       }));
-      setMappingRows(sortAndGroupRows(applyAutoMatch(rerun, players)));
+      setMappingRows(sortAndGroupRows(applyAutoMatch(rerun, players, persistedMappings.size > 0 ? persistedMappings : undefined)));
     }
     setStep("mapping");
   }
@@ -720,7 +739,7 @@ function MappingStep({
       {counts.auto > 0 && (
         <div className="rounded-lg border border-emerald-500/20 bg-emerald-950/10 px-4 py-2.5 text-sm text-emerald-300 flex items-center gap-2">
           <Zap className="h-4 w-4 shrink-0" />
-          <span>{counts.auto} players auto-matched (95%+ confidence). Override any by clicking their dropdown.</span>
+          <span>{counts.auto} players auto-matched. Override any by clicking their dropdown.</span>
         </div>
       )}
 

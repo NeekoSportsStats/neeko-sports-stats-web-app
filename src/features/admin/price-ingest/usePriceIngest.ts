@@ -17,7 +17,6 @@ async function callAdminCommand(command: string, payload: Record<string, unknown
     body: JSON.stringify({ command, payload }),
   });
   const json = await res.json();
-  console.log("admin-command response:", json);
   if (!json.ok) throw new Error(json.error ?? "Command failed");
   return json.result;
 }
@@ -124,6 +123,24 @@ export function useSavePending() {
   return { saving, savePending };
 }
 
+export function useSaveMapping() {
+  const saveMapping = useCallback(async (
+    sourceName: string,
+    playerId: number,
+  ): Promise<void> => {
+    try {
+      await callAdminCommand("save_player_name_mapping", {
+        source_name: sourceName,
+        player_id: playerId,
+      });
+    } catch (e) {
+      console.warn("[saveMapping] failed:", e instanceof Error ? e.message : e);
+    }
+  }, []);
+
+  return { saveMapping };
+}
+
 export async function resolvePlayerName(
   normalizedName: string,
   playerId: number,
@@ -136,5 +153,27 @@ export async function resolvePlayerName(
     return { success: true };
   } catch (e) {
     return { success: false, error: e instanceof Error ? e.message : "Failed" };
+  }
+}
+
+export interface PersistedMapping {
+  source_name: string;
+  player_id: number;
+  player_name: string;
+  confidence: number;
+}
+
+export async function lookupPersistedMappings(
+  sourceNames: string[],
+): Promise<PersistedMapping[]> {
+  if (sourceNames.length === 0) return [];
+  try {
+    const { data, error } = await supabase.rpc("lookup_player_name_mappings", {
+      p_source_names: sourceNames,
+    });
+    if (error || !data) return [];
+    return data as PersistedMapping[];
+  } catch {
+    return [];
   }
 }
