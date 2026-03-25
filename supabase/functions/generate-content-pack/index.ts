@@ -324,10 +324,9 @@ Deno.serve(async (req: Request) => {
       { headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   } catch (err) {
-    const msg = err instanceof Error ? err.message : JSON.stringify(err);
-    console.error("[generate-content-pack] error:", msg);
+    console.error("[generate-content-pack] error:", err instanceof Error ? err.message : JSON.stringify(err));
     return new Response(
-      JSON.stringify({ error: "Internal server error", detail: msg }),
+      JSON.stringify({ error: "Internal server error" }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   }
