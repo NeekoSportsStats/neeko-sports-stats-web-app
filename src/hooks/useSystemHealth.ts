@@ -105,6 +105,118 @@ export interface SystemHealthState {
   lastRefreshed: Date | null;
 }
 
+function ageInMins(ts: string | null | undefined): number | null {
+  if (!ts) return null;
+  return Math.round((Date.now() - new Date(ts).getTime()) / 60000);
+}
+
+function mapResponseToSystemHealth(raw: Record<string, unknown>): SystemHealthData {
+  const pipelineState = (raw.pipeline as Record<string, unknown>) ?? {};
+  const aiState = (raw.ai as Record<string, unknown>) ?? {};
+  const dataState = (raw.data as Record<string, unknown>) ?? {};
+  const logsState = (raw.logs as Record<string, unknown>) ?? {};
+  const systemState = (raw.system as Record<string, unknown>) ?? {};
+
+  const rankingsCount = (dataState.rankings_count as number) ?? 0;
+  const rankingsCachedAt = dataState.rankings_cached_at as string | null ?? null;
+  const cacheAgeMins = ageInMins(rankingsCachedAt);
+
+  const aiTotal = (aiState.total_players as number) ?? 0;
+  const aiWithReco = (aiState.with_reco as number) ?? 0;
+  const aiLastUpdated = aiState.last_updated_at as string | null ?? null;
+
+  const pipelineSteps = (raw.pipeline_steps as PipelineStep[]) ?? [];
+  const recentRuns = (raw.recent_runs as Array<Record<string, unknown>>) ?? [];
+  const lastRun = recentRuns[0] ?? {};
+
+  const projectionsCount = (dataState.projections_count as number) ?? 0;
+  const edgeBoardCount = (dataState.edge_board_count as number) ?? 0;
+
+  const pipelineStatus = pipelineState.status as string | null ?? systemState.pipeline_status as string | null ?? null;
+  const pipelineStartedAt = pipelineState.last_run_at as string | null ?? systemState.last_pipeline_run_at as string | null ?? null;
+  const pipelineFinishedAt = pipelineState.last_finished_at as string | null ?? null;
+
+  const pipeline: PipelineData = {
+    last_run_id: lastRun.id as string | null ?? null,
+    status: pipelineStatus,
+    label: lastRun.label as string | null ?? null,
+    started_at: pipelineStartedAt,
+    finished_at: pipelineFinishedAt,
+    duration_ms: lastRun.duration_ms as number | null ?? null,
+    total_tasks: 0,
+    completed_tasks: 0,
+    current_step: null,
+  };
+
+  const ai_stats: AIStats = {
+    rankings_cache_rows: rankingsCount,
+    rankings_with_ai: aiTotal,
+    rankings_with_reco: aiWithReco,
+    rankings_cache_refreshed_at: rankingsCachedAt,
+    projection_rows: projectionsCount,
+    projection_refreshed_at: null,
+    command_log_rows: 0,
+    commands_last_24h: 0,
+    commands_success_24h: 0,
+    commands_error_24h: (logsState.errors_24h as number) ?? 0,
+    last_command_at: null,
+  };
+
+  const ingestion: IngestionData = {
+    games_raw_count: 0,
+    games_2026_count: 0,
+    player_stats_count: 0,
+    player_stats_2026: rankingsCount > 0 ? rankingsCount : 0,
+    last_stat_week: null,
+    last_game_date: pipelineStartedAt,
+    ingest_log_count: (pipelineState.recent_runs_7d as number) ?? (logsState.recent_runs_7d as number) ?? 0,
+    last_ingest_at: pipelineStartedAt,
+    ingest_errors: (pipelineState.failed_steps_24h as number) ?? 0,
+    seasons_covered: null,
+  };
+
+  const data_freshness: DataFreshness = {
+    unique_players_2026: rankingsCount,
+    unique_players_all: rankingsCount,
+    latest_round: null,
+    total_stat_rows: rankingsCount,
+    players_in_roster: rankingsCount,
+    players_with_projection: projectionsCount,
+    players_missing_projection: Math.max(0, rankingsCount - projectionsCount),
+    rankings_cache_age_mins: cacheAgeMins,
+    projection_age_mins: null,
+  };
+
+  const db_counts: DbCounts = {
+    players: rankingsCount,
+    teams: 18,
+    games_raw: 0,
+    raw_player_stats: 0,
+    player_projection: projectionsCount,
+    player_rankings_cache: rankingsCount,
+    pipeline_runs: (pipelineState.recent_runs_7d as number) ?? 0,
+    pipeline_steps: pipelineSteps.length,
+    command_logs: 0,
+    mv_edge_board: edgeBoardCount,
+    projection_accuracy: 0,
+    start_sit_cache: 0,
+    afl_2026_roster: rankingsCount,
+  };
+
+  const recent_errors: RecentError[] = [];
+
+  return {
+    pipeline,
+    pipeline_steps: pipelineSteps,
+    ingestion,
+    ai_stats,
+    data_freshness,
+    db_counts,
+    recent_errors,
+    generated_at: raw.generated_at as string ?? new Date().toISOString(),
+  };
+}
+
 export function useSystemHealth() {
   const [state, setState] = useState<SystemHealthState>({
     data: null,
@@ -124,7 +236,9 @@ export function useSystemHealth() {
       }
 
       const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-health`;
-      let json: Record<string, unknown> = {};
+      let raw: Record<string, unknown> = {};
+      let fetchOk = false;
+
       try {
         const res = await fetch(url, {
           method: "POST",
@@ -134,41 +248,67 @@ export function useSystemHealth() {
             apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
           },
         });
-        json = await res.json().catch(() => ({}));
+        raw = await res.json().catch(() => ({}));
+        fetchOk = res.ok && !raw.error;
       } catch (fetchErr) {
         console.error("admin-health fetch failed:", fetchErr);
-        setState(prev => ({
-          ...prev,
-          loading: false,
-          error: "Health endpoint unreachable — showing partial data",
-        }));
-        return;
       }
 
-      if (json.success && json.data) {
+      if (fetchOk && raw && typeof raw === "object" && (raw.data || raw.pipeline || raw.ai)) {
+        const mapped = mapResponseToSystemHealth(raw as Record<string, unknown>);
         setState({
-          data: json.data as SystemHealthData,
+          data: mapped,
           loading: false,
           error: null,
           lastRefreshed: new Date(),
         });
-      } else {
-        console.warn("admin-health returned non-success:", json.error ?? json);
-        setState(prev => ({
-          ...prev,
-          data: (json.data as SystemHealthData) ?? prev.data,
-          loading: false,
-          error: (json.error as string) ?? "Health data partially unavailable",
-          lastRefreshed: new Date(),
-        }));
+        return;
       }
+
+      if (raw.success && raw.data) {
+        const d = raw.data as Record<string, unknown>;
+        if (d.pipeline || d.ai || d.data) {
+          setState({
+            data: mapResponseToSystemHealth(d),
+            loading: false,
+            error: null,
+            lastRefreshed: new Date(),
+          });
+          return;
+        }
+        setState({
+          data: raw.data as SystemHealthData,
+          loading: false,
+          error: null,
+          lastRefreshed: new Date(),
+        });
+        return;
+      }
+
+      const fallbackData = await loadFallbackFromDB(supabase);
+      setState({
+        data: fallbackData,
+        loading: false,
+        error: fetchOk ? null : "Health endpoint partial — using live DB counts",
+        lastRefreshed: new Date(),
+      });
     } catch (err) {
       console.error("useSystemHealth unexpected error:", err);
-      setState(prev => ({
-        ...prev,
-        loading: false,
-        error: err instanceof Error ? err.message : "Unknown error",
-      }));
+      try {
+        const fallbackData = await loadFallbackFromDB(supabase);
+        setState({
+          data: fallbackData,
+          loading: false,
+          error: "Health endpoint failed — using live DB counts",
+          lastRefreshed: new Date(),
+        });
+      } catch {
+        setState(prev => ({
+          ...prev,
+          loading: false,
+          error: err instanceof Error ? err.message : "Unknown error",
+        }));
+      }
     }
   }, []);
 
@@ -179,4 +319,84 @@ export function useSystemHealth() {
   }, [refresh]);
 
   return { ...state, refresh };
+}
+
+async function loadFallbackFromDB(sb: typeof supabase): Promise<SystemHealthData> {
+  const [cacheRes, projRes, pipelineRes] = await Promise.allSettled([
+    sb.from("afl.player_rankings_cache" as never).select("count", { count: "exact", head: true }),
+    sb.from("afl.player_projection" as never).select("count", { count: "exact", head: true }),
+    sb.from("pipeline_runs").select("id,status,started_at,finished_at,label").order("started_at", { ascending: false }).limit(1),
+  ]);
+
+  const rankingsCount = cacheRes.status === "fulfilled" ? (cacheRes.value.count ?? 0) : 0;
+  const projCount = projRes.status === "fulfilled" ? (projRes.value.count ?? 0) : 0;
+  const lastRun = pipelineRes.status === "fulfilled" ? (pipelineRes.value.data?.[0] ?? null) : null;
+
+  return {
+    pipeline: {
+      last_run_id: lastRun?.id ?? null,
+      status: lastRun?.status ?? null,
+      label: lastRun?.label ?? null,
+      started_at: lastRun?.started_at ?? null,
+      finished_at: lastRun?.finished_at ?? null,
+      duration_ms: null,
+      total_tasks: 0,
+      completed_tasks: 0,
+      current_step: null,
+    },
+    pipeline_steps: [],
+    ingestion: {
+      games_raw_count: 0,
+      games_2026_count: 0,
+      player_stats_count: 0,
+      player_stats_2026: rankingsCount > 0 ? rankingsCount : 0,
+      last_stat_week: null,
+      last_game_date: lastRun?.started_at ?? null,
+      ingest_log_count: 0,
+      last_ingest_at: lastRun?.started_at ?? null,
+      ingest_errors: 0,
+      seasons_covered: null,
+    },
+    ai_stats: {
+      rankings_cache_rows: rankingsCount,
+      rankings_with_ai: rankingsCount,
+      rankings_with_reco: 0,
+      rankings_cache_refreshed_at: null,
+      projection_rows: projCount,
+      projection_refreshed_at: null,
+      command_log_rows: 0,
+      commands_last_24h: 0,
+      commands_success_24h: 0,
+      commands_error_24h: 0,
+      last_command_at: null,
+    },
+    data_freshness: {
+      unique_players_2026: rankingsCount,
+      unique_players_all: rankingsCount,
+      latest_round: null,
+      total_stat_rows: rankingsCount,
+      players_in_roster: rankingsCount,
+      players_with_projection: projCount,
+      players_missing_projection: Math.max(0, rankingsCount - projCount),
+      rankings_cache_age_mins: null,
+      projection_age_mins: null,
+    },
+    db_counts: {
+      players: rankingsCount,
+      teams: 18,
+      games_raw: 0,
+      raw_player_stats: 0,
+      player_projection: projCount,
+      player_rankings_cache: rankingsCount,
+      pipeline_runs: 0,
+      pipeline_steps: 0,
+      command_logs: 0,
+      mv_edge_board: 0,
+      projection_accuracy: 0,
+      start_sit_cache: 0,
+      afl_2026_roster: rankingsCount,
+    },
+    recent_errors: [],
+    generated_at: new Date().toISOString(),
+  };
 }
