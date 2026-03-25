@@ -121,7 +121,8 @@ function selectPlayersForDay(
 ): { player_id: number; player_name: string; team: string; category: string; angle: string; content_type: string; player2_id: number | null; player2_name: string | null }[] {
   const config = DAY_CONFIGS[dayIndex];
   const available = players.filter(p => !usedPlayerIds.has(p.player_id));
-  const sorted = [...available].sort((a, b) => a.rank - b.rank);
+  // rank field now stores neeko_rating_scaled — higher is better, so sort descending
+  const sorted = [...available].sort((a, b) => b.rank - a.rank);
 
   const valuePlayers = [...sorted].sort((a, b) => b.value_score - a.value_score);
   const breakoutPlayers = [...sorted].filter(p => p.upside_pct >= 10 || p.form_score >= 60).sort((a, b) => b.upside_pct - a.upside_pct);
@@ -167,7 +168,7 @@ function selectPlayersForDay(
           price_change: 0,
           value_score: 6,
           best_value_score: 6,
-          rank: 10,
+          rank: 50,
           form_score: 70,
           consistency: 70,
           captain_score: 70,
@@ -294,22 +295,26 @@ Deno.serve(async (req: Request) => {
       },
     });
 
+    // Fix: "rank" column does not exist in afl.player_rankings_cache.
+    // Use neeko_rating_scaled (higher = better) as the ranking proxy.
+    // Order descending so top-rated players come first.
     const { data: rawPlayers, error: playersError } = await aflDb
       .from("player_rankings_cache")
       .select(`
         player_id, player_name, team, position,
         projection_final, ceiling, floor, price, prev_price, price_change,
-        value_score, best_value_score, rank, form_score, consistency,
+        value_score, best_value_score, neeko_rating_scaled, form_score, consistency,
         captain_score, risk_rating, upside_pct, matchup_label, signal,
         ai_recommendation, recommendation_short, market_watch_category, games_played
       `)
       .eq("is_available", true)
       .not("projection_final", "is", null)
-      .order("rank", { ascending: true })
+      .order("neeko_rating_scaled", { ascending: false })
       .limit(60);
 
     if (playersError) {
       console.error("[plan-builder] Player fetch error:", playersError.message);
+      throw new Error(`Player fetch failed: ${playersError.message}`);
     }
 
     console.log(`[DB INSERT TEST] player_rankings_cache: fetched ${rawPlayers?.length ?? 0} rows`);
@@ -327,7 +332,8 @@ Deno.serve(async (req: Request) => {
       price_change: Number(p.price_change ?? 0),
       value_score: Number(p.value_score ?? 0),
       best_value_score: Number(p.best_value_score ?? 0),
-      rank: Number(p.rank ?? 999),
+      // Store neeko_rating_scaled in rank field — higher = better (sort descending in selectPlayersForDay)
+      rank: Number(p.neeko_rating_scaled ?? 0),
       form_score: Number(p.form_score ?? 0),
       consistency: Number(p.consistency ?? 0),
       captain_score: Number(p.captain_score ?? 0),
@@ -341,8 +347,12 @@ Deno.serve(async (req: Request) => {
       games_played: Number(p.games_played ?? 0),
     }));
 
+    console.log(`[plan-builder] Mapped ${mappedPlayers.length} players. Top player: ${mappedPlayers[0]?.player_name ?? "none"} (neeko_rating_scaled=${mappedPlayers[0]?.rank ?? 0})`);
+
     const { data: latestRound } = await db.rpc("get_latest_completed_round");
     const roundNum = Number(latestRound ?? 0);
+
+    console.log(`[plan-builder] Latest completed round: ${roundNum}`);
 
     let proofPlayers: ProofPlayer[] = [];
     if (roundNum > 0) {
@@ -480,9 +490,11 @@ Deno.serve(async (req: Request) => {
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     console.error("[plan-builder] Fatal error:", msg);
+    // Return 200 with error payload so the frontend receives a parseable response
+    // rather than a network-level failure
     return new Response(
       JSON.stringify({ error: msg }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   }
 });
