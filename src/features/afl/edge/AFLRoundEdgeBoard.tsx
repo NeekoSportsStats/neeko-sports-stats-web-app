@@ -1051,7 +1051,15 @@ export default function AFLRoundEdgeBoard() {
       ]);
 
       if (rpcResult.error) throw rpcResult.error;
-      const mapped = ((rpcResult.data as any[]) ?? []).map((r: any): RankingRow => ({
+      const mapped = ((rpcResult.data as any[]) ?? [])
+        .filter((r: any) =>
+          r.player_name &&
+          r.team &&
+          Number(r.projection_final ?? 0) > 0 &&
+          Number(r.price ?? 0) > 0 &&
+          Number(r.value_score ?? 0) > 0,
+        )
+        .map((r: any): RankingRow => ({
         player_id:             r.player_id ?? null,
         player_name:           r.player_name ?? "",
         team:                  r.team ?? "",

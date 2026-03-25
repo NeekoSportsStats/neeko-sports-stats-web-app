@@ -836,7 +836,13 @@ function EdgeBoardPreview() {
         .from("v_edge_board_safe")
         .select("player_name, team, position, neeko_rating, projection_final, ceiling_estimate, projection_confidence, risk_rating, upside_rating, signal_type");
 
-      const rows = (data ?? []) as EdgeRow[];
+      const rows = ((data ?? []) as EdgeRow[]).filter(
+        (r) =>
+          r.player_name &&
+          r.team &&
+          (r.projection_final ?? 0) > 0 &&
+          (r.neeko_rating ?? 0) > 0,
+      );
 
       if (rows.length === 0) {
         setSignals([]);
