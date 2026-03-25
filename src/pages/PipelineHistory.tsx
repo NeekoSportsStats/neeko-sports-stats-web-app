@@ -7,7 +7,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, RefreshCw, CircleCheck as CheckCircle, Circle as XCircle, Clock, ChevronDown, ChevronRight, Activity } from "lucide-react";
 
-const ADMIN_EMAIL = "neekotrading@gmail.com";
 
 interface PipelineRunRow {
   id: string;
@@ -202,19 +201,10 @@ export default function PipelineHistory() {
     if (loading) return;
     if (!user) { navigate("/auth"); return; }
 
-    if (user.email === ADMIN_EMAIL) {
-      setIsAdmin(true);
-      setCheckingAdmin(false);
-      return;
-    }
-
     supabase
-      .from("user_roles")
-      .select("role")
-      .eq("user_id", user.id)
-      .maybeSingle()
+      .rpc("get_access_state")
       .then(({ data, error }) => {
-        if (error || data?.role !== "admin") {
+        if (error || !data?.is_admin) {
           navigate("/");
         } else {
           setIsAdmin(true);

@@ -112,13 +112,7 @@ Deno.serve(async (req) => {
       return err(`No price configured for plan: ${plan}`, 500);
     }
 
-    console.log('stripe-checkout: inputs', {
-      plan,
-      price_id,
-      success_url,
-      cancel_url,
-      keyMode: stripeSecret.startsWith('sk_live_') ? 'live' : 'test',
-    });
+    console.log('stripe-checkout: inputs', { plan, price_id });
 
     const authHeader = req.headers.get('Authorization') ?? '';
     const token = authHeader.replace('Bearer ', '');

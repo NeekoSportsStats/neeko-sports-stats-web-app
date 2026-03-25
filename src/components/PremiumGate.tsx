@@ -23,11 +23,8 @@ export function PremiumGate({ children, isLocked, mode = "solid", blur }: Premiu
 
   return (
     <div className="relative rounded-xl overflow-hidden">
-      <div className="invisible pointer-events-none select-none">
-        {children}
-      </div>
       <div
-        className="absolute inset-0 flex items-center justify-center rounded-xl"
+        className="flex items-center justify-center rounded-xl py-8"
         style={{
           background: "linear-gradient(180deg, rgba(245,200,76,0.08) 0%, rgba(245,200,76,0.04) 100%)",
           border: "1px solid rgba(245,200,76,0.35)",
