@@ -236,6 +236,102 @@ function normalisePlatformVariants(
   return { tiktok, instagram, reddit };
 }
 
+// ── STRATEGY BUILDER ──────────────────────────────────────────────────────────
+
+interface StrategyObject {
+  goal: string;
+  angle: string;
+  audience: string;
+  timing: string;
+  funnel_stage: string;
+  cta_type: string;
+  why_it_works: string;
+}
+
+const CATEGORY_STRATEGY: Record<string, Omit<StrategyObject, "timing" | "why_it_works">> = {
+  Value:        { goal: "conversion",  angle: "opportunity", audience: "casual → serious", funnel_stage: "middle", cta_type: "medium" },
+  Breakout:     { goal: "conversion",  angle: "opportunity", audience: "serious",          funnel_stage: "middle", cta_type: "medium" },
+  Trap:         { goal: "engagement",  angle: "fear",        audience: "casual",           funnel_stage: "top",    cta_type: "soft"   },
+  Top3:         { goal: "authority",   angle: "proof",       audience: "all",              funnel_stage: "middle", cta_type: "medium" },
+  Proof:        { goal: "conversion",  angle: "proof",       audience: "serious → hardcore", funnel_stage: "bottom", cta_type: "hard" },
+  Captain:      { goal: "conversion",  angle: "opportunity", audience: "serious",          funnel_stage: "middle", cta_type: "medium" },
+  H2H:          { goal: "engagement",  angle: "debate",      audience: "casual",           funnel_stage: "top",    cta_type: "soft"   },
+  Injury:       { goal: "engagement",  angle: "fear",        audience: "all",              funnel_stage: "top",    cta_type: "soft"   },
+  Conversation: { goal: "engagement",  angle: "debate",      audience: "casual",           funnel_stage: "top",    cta_type: "soft"   },
+  Engagement:   { goal: "engagement",  angle: "debate",      audience: "casual",           funnel_stage: "top",    cta_type: "soft"   },
+};
+
+const DAY_TIMING: Record<string, string> = {
+  monday:    "6pm — early decisions",
+  tuesday:   "7pm — research window",
+  wednesday: "8pm — deeper analysis",
+  thursday:  "6pm — pre-lockout",
+  friday:    "5pm — final decisions",
+  saturday:  "11am — game day",
+  sunday:    "10am — last chance",
+};
+
+const WHY_IT_WORKS_TEMPLATES: Record<string, string[]> = {
+  Value:        [
+    "Targets players hunting price-rise opportunities before the market moves.",
+    "Casual fans feel like they're getting insider edge before lockout.",
+    "Triggers action by making the audience feel they'll miss out if they wait.",
+  ],
+  Breakout:     [
+    "Leverages the urgency of rising prices — act now or pay more later.",
+    "Appeals to serious players who want to buy before the crowd catches on.",
+    "Creates a clear window of opportunity that drives immediate decisions.",
+  ],
+  Trap:         [
+    "Warns casual players of a costly mistake before it's too late.",
+    "Fear of wasting trades drives engagement and comments.",
+    "Positions Neeko as the protector — the edge that saves trades.",
+  ],
+  Top3:         [
+    "Definitive ranked lists drive saves and return visits for reference.",
+    "Builds authority by making clear, data-backed decisions the audience can trust.",
+    "Works across all fan levels — everyone wants the top picks before game day.",
+  ],
+  Proof:        [
+    "Real projected vs actual scores build the strongest credibility signal.",
+    "Hardcore users respond to proof — it drives upgrades and referrals.",
+    "Showing accuracy converts fence-sitters into paying subscribers.",
+  ],
+  Captain:      [
+    "Captain decisions are the highest-stakes weekly choice — decisive content wins.",
+    "Serious players want validation from data before locking their captain.",
+    "Clear conviction drives saves and profile visits ahead of lockout.",
+  ],
+  H2H:          [
+    "Forces the audience to pick a side — every comment is an engagement win.",
+    "Debate format drives algorithm reach through comment volume.",
+    "The controversy keeps users coming back to defend their pick.",
+  ],
+  Injury:       [
+    "Breaking news framing triggers immediate action from anxious fantasy owners.",
+    "Replacement content is searched and shared rapidly after injury news drops.",
+    "Positions Neeko as the go-to source for urgent, timely fantasy intelligence.",
+  ],
+  Conversation: [
+    "Open questions are the lowest-friction way to drive comments at scale.",
+    "Community-style posts build audience trust and brand affinity over time.",
+    "Polls keep the algorithm fed while the audience does the work.",
+  ],
+  Engagement:   [
+    "Controversy-first format maximises reach through algorithm-boosting comment volume.",
+    "Easy-to-answer polls pull in casual users who wouldn't engage with data posts.",
+    "Community debate format builds long-term audience loyalty.",
+  ],
+};
+
+function buildStrategy(category: string, dayKey: string, playerName: string): StrategyObject {
+  const base = CATEGORY_STRATEGY[category] ?? CATEGORY_STRATEGY.Value;
+  const timing = DAY_TIMING[dayKey?.toLowerCase() ?? ""] ?? "Optimal posting window for AFL Fantasy cycle";
+  const whyTemplates = WHY_IT_WORKS_TEMPLATES[category] ?? WHY_IT_WORKS_TEMPLATES.Value;
+  const why = whyTemplates[Math.floor(Math.abs(playerName.charCodeAt(0) ?? 0) % whyTemplates.length)];
+  return { ...base, timing, why_it_works: why };
+}
+
 function isPlatformEmpty(platforms: PlatformVariants): boolean {
   const { tiktok, instagram, reddit } = platforms;
   return (
@@ -722,6 +818,7 @@ function normaliseGeneratedPost(
   playerName: string,
   category: string,
   team: string,
+  dayKey = "",
 ): Record<string, unknown> {
   const hooks: string[] = Array.isArray(raw.hooks)
     ? (raw.hooks as unknown[]).map(h => ensureString(h)).filter(Boolean)
@@ -758,15 +855,7 @@ function normaliseGeneratedPost(
   const hookScoreRaw = Number(raw.hook_score ?? 0);
   const hook_score = hookScoreRaw >= 1 && hookScoreRaw <= 10 ? Math.round(hookScoreRaw * 10) / 10 : 6.5;
 
-  const strategyJson = raw.strategy_json && typeof raw.strategy_json === "object"
-    ? raw.strategy_json
-    : {
-        goal: "Drive engagement",
-        trigger: "FOMO",
-        expected_behaviour: "save",
-        best_posting_time: "8am-9am",
-        cta: "Link in bio",
-      };
+  const strategyJson = buildStrategy(category, dayKey, playerName);
 
   const platformVariants = normalisePlatformVariants(raw, playerName, category, team);
 
@@ -932,14 +1021,14 @@ Deno.serve(async (req: Request) => {
 
       try {
         rawResult = await callOpenAI(systemPrompt, userPrompt);
-        normalised = normaliseGeneratedPost(rawResult, top3Players[0].player_name, "Top3", top3Players[0].team);
+        normalised = normaliseGeneratedPost(rawResult, top3Players[0].player_name, "Top3", top3Players[0].team, typedPost.day_key);
 
         const platforms = normalised.platform_variants as PlatformVariants;
         if (isPlatformEmpty(platforms)) {
           console.warn(`[generate-content-post] Top3 platform fields empty for ${postId}, retrying...`);
           try {
             const retryResult = await callOpenAI(systemPrompt, userPrompt);
-            const retryNormalised = normaliseGeneratedPost(retryResult, top3Players[0].player_name, "Top3", top3Players[0].team);
+            const retryNormalised = normaliseGeneratedPost(retryResult, top3Players[0].player_name, "Top3", top3Players[0].team, typedPost.day_key);
             const retryPlatforms = retryNormalised.platform_variants as PlatformVariants;
             if (!isPlatformEmpty(retryPlatforms)) {
               normalised = retryNormalised;
@@ -1080,7 +1169,7 @@ Deno.serve(async (req: Request) => {
 
     try {
       rawResult = await callOpenAI(systemPrompt, userPrompt);
-      normalised = normaliseGeneratedPost(rawResult, playerName, category, team);
+      normalised = normaliseGeneratedPost(rawResult, playerName, category, team, typedPost.day_key);
 
       // ── Retry if platforms are empty ───────────────────────────────────────
       const platforms = normalised.platform_variants as PlatformVariants;
@@ -1088,7 +1177,7 @@ Deno.serve(async (req: Request) => {
         console.warn(`[generate-content-post] Platform fields empty for ${postId}, retrying...`);
         try {
           const retryResult = await callOpenAI(systemPrompt, userPrompt);
-          const retryNormalised = normaliseGeneratedPost(retryResult, playerName, category, team);
+          const retryNormalised = normaliseGeneratedPost(retryResult, playerName, category, team, typedPost.day_key);
           const retryPlatforms = retryNormalised.platform_variants as PlatformVariants;
 
           if (!isPlatformEmpty(retryPlatforms)) {
@@ -1130,7 +1219,7 @@ Deno.serve(async (req: Request) => {
       try {
         console.log(`[generate-content-post] Attempting recovery generation for ${postId}...`);
         const recoveryResult = await callOpenAI(systemPrompt, userPrompt);
-        normalised = normaliseGeneratedPost(recoveryResult, playerName, category, team);
+        normalised = normaliseGeneratedPost(recoveryResult, playerName, category, team, typedPost.day_key);
         console.log(`[generate-content-post] Recovery succeeded for ${postId}`);
       } catch (_recoveryErr) {
         await db

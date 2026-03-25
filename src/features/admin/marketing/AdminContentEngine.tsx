@@ -427,54 +427,112 @@ function PlatformVariantsTabContent({ post }: { post: WeeklyContentPost }) {
 
 // ── STRATEGY TAB ──────────────────────────────────────────────────────────────
 
-function StrategyTabContent({ post }: { post: WeeklyContentPost }) {
-  const strategy = post.strategy_json as Record<string, unknown> | null;
+const GOAL_META: Record<string, { label: string; color: string; bg: string }> = {
+  conversion: { label: "Conversion",  color: "text-emerald-700 dark:text-emerald-300", bg: "bg-emerald-500/10 border-emerald-500/30" },
+  engagement: { label: "Engagement",  color: "text-amber-700 dark:text-amber-300",    bg: "bg-amber-500/10 border-amber-500/30"   },
+  authority:  { label: "Authority",   color: "text-sky-700 dark:text-sky-300",        bg: "bg-sky-500/10 border-sky-500/30"       },
+};
 
-  if (!strategy) {
+const FUNNEL_META: Record<string, { label: string; color: string }> = {
+  top:    { label: "Top of Funnel",    color: "text-amber-600 dark:text-amber-400"   },
+  middle: { label: "Middle of Funnel", color: "text-sky-600 dark:text-sky-400"       },
+  bottom: { label: "Bottom of Funnel", color: "text-emerald-600 dark:text-emerald-400" },
+};
+
+const CTA_META: Record<string, { label: string; description: string }> = {
+  soft:   { label: "Soft CTA",   description: "Comment / poll / share" },
+  medium: { label: "Medium CTA", description: "Save / profile visit"   },
+  hard:   { label: "Hard CTA",   description: "Click / subscribe / buy" },
+};
+
+function StrategyTabContent({ post }: { post: WeeklyContentPost }) {
+  const strategy = post.strategy_json as Record<string, string> | null;
+
+  if (!strategy || !strategy.goal) {
     return (
-      <div className="p-4 text-center">
-        <BarChart2 className="h-6 w-6 text-muted-foreground/40 mx-auto mb-2" />
-        <p className="text-xs text-muted-foreground">Strategy analysis is generated with the post.</p>
+      <div className="p-6 text-center space-y-2">
+        <BarChart2 className="h-7 w-7 text-muted-foreground/30 mx-auto" />
+        <p className="text-xs text-muted-foreground">Generate this post to see its strategy breakdown.</p>
       </div>
     );
   }
 
-  const fields: { label: string; key: string }[] = [
-    { label: "Objective",      key: "objective" },
-    { label: "Target Audience", key: "target_audience" },
-    { label: "Tone",           key: "tone" },
-    { label: "CTA",            key: "cta" },
-    { label: "Best Time",      key: "best_time" },
-    { label: "Predicted Reach", key: "predicted_reach" },
-  ];
+  const goalMeta  = GOAL_META[strategy.goal]   ?? GOAL_META.engagement;
+  const funnelMeta = FUNNEL_META[strategy.funnel_stage] ?? FUNNEL_META.middle;
+  const ctaMeta   = CTA_META[strategy.cta_type] ?? CTA_META.medium;
 
   return (
-    <div className="p-4 space-y-3">
+    <div className="p-4 space-y-4">
+      {/* Conversion score header */}
       {post.conversion_score != null && (
-        <div className="flex items-center gap-3 p-3 bg-muted/20 border border-border rounded-lg">
-          <div className="text-center">
-            <p className="text-2xl font-bold font-mono">{post.conversion_score.toFixed(1)}</p>
-            <p className="text-[10px] text-muted-foreground">/ 10</p>
+        <div className="flex items-center gap-4 p-3 rounded-xl border border-border bg-muted/10">
+          <div className="text-center shrink-0">
+            <p className="text-3xl font-bold font-mono leading-none">{post.conversion_score.toFixed(1)}</p>
+            <p className="text-[10px] text-muted-foreground mt-0.5">/ 10</p>
           </div>
-          <div>
+          <div className="h-8 w-px bg-border shrink-0" />
+          <div className="space-y-0.5 min-w-0">
             <p className="text-xs font-semibold">Conversion Score</p>
-            {post.confidence_label && <p className="text-[10px] text-muted-foreground">{post.confidence_label} confidence</p>}
-            {post.creative_style && <p className="text-[10px] text-muted-foreground">{post.creative_style}</p>}
+            <div className="flex items-center gap-2 flex-wrap">
+              {post.confidence_label && (
+                <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded border ${goalMeta.bg} ${goalMeta.color}`}>
+                  {post.confidence_label}
+                </span>
+              )}
+              {post.hook_type && (
+                <span className="text-[10px] text-muted-foreground border border-border rounded px-1.5 py-0.5">
+                  {post.hook_type}
+                </span>
+              )}
+            </div>
           </div>
         </div>
       )}
+
+      {/* Goal + Angle row */}
       <div className="grid grid-cols-2 gap-2">
-        {fields.map(({ label, key }) => {
-          const val = strategy[key];
-          if (!val) return null;
-          return (
-            <div key={key} className="p-2.5 bg-muted/10 border border-border rounded-md">
-              <p className="text-[10px] text-muted-foreground uppercase tracking-wide mb-0.5">{label}</p>
-              <p className="text-xs font-medium">{String(val)}</p>
-            </div>
-          );
-        })}
+        <div className={`p-3 rounded-lg border ${goalMeta.bg}`}>
+          <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-1">Goal</p>
+          <p className={`text-sm font-bold capitalize ${goalMeta.color}`}>{strategy.goal}</p>
+        </div>
+        <div className="p-3 rounded-lg border border-border bg-muted/10">
+          <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-1">Angle</p>
+          <p className="text-sm font-bold capitalize">{strategy.angle}</p>
+        </div>
       </div>
+
+      {/* Audience */}
+      <div className="p-3 rounded-lg border border-border bg-muted/10">
+        <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-1">Audience</p>
+        <p className="text-xs font-medium capitalize">{strategy.audience}</p>
+      </div>
+
+      {/* Funnel + CTA row */}
+      <div className="grid grid-cols-2 gap-2">
+        <div className="p-3 rounded-lg border border-border bg-muted/10">
+          <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-1">Funnel Stage</p>
+          <p className={`text-xs font-semibold ${funnelMeta.color}`}>{funnelMeta.label}</p>
+        </div>
+        <div className="p-3 rounded-lg border border-border bg-muted/10">
+          <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-1">CTA Type</p>
+          <p className="text-xs font-semibold">{ctaMeta.label}</p>
+          <p className="text-[10px] text-muted-foreground mt-0.5">{ctaMeta.description}</p>
+        </div>
+      </div>
+
+      {/* Best Time */}
+      <div className="p-3 rounded-lg border border-border bg-muted/10">
+        <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-1">Best Time to Post</p>
+        <p className="text-xs font-medium">{strategy.timing}</p>
+      </div>
+
+      {/* Why it works */}
+      {strategy.why_it_works && (
+        <div className="p-3 rounded-lg border border-border bg-muted/5">
+          <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-1.5">Why It Works</p>
+          <p className="text-xs text-foreground/80 leading-relaxed italic">"{strategy.why_it_works}"</p>
+        </div>
+      )}
     </div>
   );
 }
