@@ -222,7 +222,7 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    console.log("[generate-weekly-content] BUILD MARKER 2026-03-25-CONTENT-FIX");
+    console.log("[generate-weekly-content] BUILD MARKER 2026-03-25-CONTENT-FIX-V2");
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL");
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
@@ -541,6 +541,8 @@ Deno.serve(async (req: Request) => {
           weekly_plan_id: planId,
           day_key: config.label,
           slot_key: String(slot + 1),
+          day_number: dayIndex,
+          slot_number: slot + 1,
           player_id: post.player_id || null,
           player_name: post.player_name || null,
           player2_id: post.player2_id,
