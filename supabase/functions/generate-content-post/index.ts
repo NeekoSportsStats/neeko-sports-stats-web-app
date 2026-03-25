@@ -127,17 +127,21 @@ VISUAL PLAN RULES — THIS IS THE MOST IMPORTANT FIELD:
 - Must be a single detailed STRING. Specific enough that a designer could execute it without questions.
 
 IMAGE PROMPT RULES (ai_image_prompt field):
-- Write a Midjourney/DALL-E/Ideogram-ready image generation brief.
-- Format: "Style: [photorealistic/illustration/graphic design]. Subject: [exact scene]. Colours: [hex codes]. Text overlay: [exact words]. Composition: [layout]. Mood: [urgent/celebratory/analytical/dramatic]."
-- Always reference the player name, team colours, and Neeko Sports brand (dark background, green #00C853).
-- Under 120 words. Specific enough the image engine doesn't need to guess.
+- Write an ultra-high-end Midjourney/DALL-E/Ideogram image brief that a professional creative director would approve.
+- Style: "Ultra-realistic sports editorial" OR "ESPN/Fox Sports graphic design" — pick the one that fits.
+- Structure it exactly as: "Style: [descriptor]. Subject: [player name], [pose/action], [jersey/team colours]. Camera: [angle — low angle, eye-level, overhead]. Lighting: [stadium lighting/dramatic rim light/cinematic contrast]. Composition: [rule of thirds/hero centre/split-screen]. Background: [MCG/stadium crowd blur/dark gradient]. Details: [specific jersey, motion blur, sweat, intensity]. Text overlay: [exact bold headline words — max 5 words]. Stats bar: [$price, projection Xpts, value score]. Colour palette: dark #0D0D0D background, team primary colour, green accent #00C853. Mood: [urgent/analytical/dramatic/celebratory]. Brand: Neeko Sports logo bottom-right, white on dark."
+- Player name and team must appear in the prompt.
+- Under 130 words. Every field filled — no vague descriptors.
 
 VIDEO PROMPT RULES (ai_video_prompt field):
-- Write a Runway/Sora/Kling-ready video generation brief.
-- Scene-by-scene: "Scene [N] (timing): [visual description], camera movement, text overlay, transition."
-- Include opening hook visual, data reveal moment, CTA end card.
-- Total duration: 15-25 seconds. Neeko branding: dark background, green accent, bold typography.
-- Under 150 words.
+- Write a production-grade Runway/Sora/Kling video brief — as if briefing a motion graphics studio.
+- Three mandatory scenes:
+  Scene 1 (0-4s): Hook visual — [exact text animating in], [camera movement], [colour flash or zoom], [sound note].
+  Scene 2 (4-14s): Data reveal — [stats appearing one by one], [player image/graphic], [specific numbers from player data], [animation style — slide-in/fade/count-up].
+  Scene 3 (14-20s): CTA end card — [Neeko Sports branding], [green #00C853 accent flash], [bold CTA text], [fade to logo].
+- Specify: camera movement per scene, text overlay exact words, transition style between scenes.
+- Neeko branding throughout: dark background, green #00C853 accent, bold white typography.
+- Under 160 words. Scene timings must add to 15-25 seconds total.
 
 CREATIVE STYLE — assign one per post from this exact list:
 - pov_stadium: first-person stadium perspective, creates immersion
@@ -261,9 +265,22 @@ OUTPUT FORMAT (strict JSON, no markdown):
     "cta": "primary call to action"
   },
   "platform_variants": {
-    "tiktok": "TikTok-specific adaptation (15-30s, trending sounds note, text overlay brief)",
-    "instagram": "Instagram-specific adaptation (Reel or Story format, visual notes)",
-    "reddit": "Reddit-specific adaptation (r/AFLFantasy tone, data-heavy, no promotional tone)"
+    "tiktok": {
+      "hook": "Opening line under 10 words — must create immediate tension or curiosity",
+      "caption": "TikTok caption 1-2 punchy lines with numbers, trending and urgent tone",
+      "hashtags": ["#AFLFantasy", "#NeekoSports", "#AFL", "#FantasyTips", "<2 more relevant tags>"],
+      "cta": "Single action CTA — e.g. 'Link in bio for full breakdown'"
+    },
+    "instagram": {
+      "hook": "Instagram hook line — bold opinion or surprising stat, under 15 words",
+      "caption": "2-3 lines. Line 1: bold claim. Lines 2-3: data points. Visual and aspirational tone.",
+      "hashtags": ["#AFLFantasy", "#NeekoSports", "#AFL", "#FantasyFootball", "<3 more relevant tags>"],
+      "carousel_text": "If applicable: slide 1 headline | slide 2 stat | slide 3 verdict | slide 4 CTA"
+    },
+    "reddit": {
+      "title": "r/AFLFantasy post title — data-led, no promotional language, reads like a genuine community post",
+      "body": "3-5 sentences. Open with the data finding. No marketing tone. End with a genuine question to drive discussion. Reference Neeko model naturally if relevant."
+    }
   },
   "ctas": [
     "Direct conversion CTA",
@@ -384,13 +401,49 @@ function normaliseGeneratedPost(raw: Record<string, unknown>): Record<string, un
         cta: "Link in bio",
       };
 
-  const platformVariants = raw.platform_variants && typeof raw.platform_variants === "object"
-    ? raw.platform_variants
-    : {
-        tiktok: ensureString(raw.voice_script || "").slice(0, 150),
-        instagram: ensureString(raw.caption_script || "").slice(0, 200),
-        reddit: `Data-driven pick for r/AFLFantasy: ${ensureString(raw.voice_script || "").slice(0, 200)}`,
-      };
+  const rawVariants = raw.platform_variants;
+  let platformVariants: Record<string, unknown>;
+
+  if (rawVariants && typeof rawVariants === "object" && !Array.isArray(rawVariants)) {
+    const v = rawVariants as Record<string, unknown>;
+    const normalisePlatform = (p: unknown, fallbackCaption: string, fallbackHook: string): Record<string, unknown> => {
+      if (p && typeof p === "object" && !Array.isArray(p)) return p as Record<string, unknown>;
+      const text = typeof p === "string" ? p : fallbackCaption;
+      return { hook: fallbackHook, caption: text, hashtags: ["#AFLFantasy", "#NeekoSports", "#AFL"] };
+    };
+    const voice = ensureString(raw.voice_script || "");
+    const caption = ensureString(raw.caption_script || "");
+    platformVariants = {
+      tiktok: normalisePlatform(v.tiktok, voice.slice(0, 150),
+        voice.split(".")[0]?.trim() || "This is your edge this round."),
+      instagram: normalisePlatform(v.instagram, caption.slice(0, 200),
+        caption.split("\n")[0]?.trim() || "The data is clear."),
+      reddit: normalisePlatform(v.reddit,
+        `Data analysis: ${voice.slice(0, 250)}`,
+        ""),
+    };
+  } else {
+    const voice = ensureString(raw.voice_script || "");
+    const caption = ensureString(raw.caption_script || "");
+    platformVariants = {
+      tiktok: {
+        hook: voice.split(".")[0]?.trim().slice(0, 80) || "This is your edge this round.",
+        caption: voice.slice(0, 150),
+        hashtags: ["#AFLFantasy", "#NeekoSports", "#AFL", "#FantasyTips"],
+        cta: "Full breakdown — link in bio.",
+      },
+      instagram: {
+        hook: caption.split("\n")[0]?.trim() || "The data doesn't lie.",
+        caption: caption.slice(0, 200),
+        hashtags: ["#AFLFantasy", "#NeekoSports", "#AFL", "#FantasyFootball"],
+        carousel_text: "",
+      },
+      reddit: {
+        title: `[Data] ${ensureString(raw.player_name || "This player")} flagged by Neeko model this round`,
+        body: `Data-driven analysis: ${voice.slice(0, 300)} Worth considering before lockout — what's everyone else seeing?`,
+      },
+    };
+  }
 
   return {
     hooks,
@@ -539,9 +592,22 @@ Deno.serve(async (req: Request) => {
           cta: "Link in bio",
         },
         platform_variants: {
-          tiktok: `Quick ${postRow.category} pick breakdown — ${postRow.player_name ?? "TBD"} this round. Full data at Neeko Sports.`,
-          instagram: `${postRow.player_name ?? "TBD"} is your ${postRow.category} edge this week. Full analysis at Neeko Sports — link in bio.`,
-          reddit: `[Data] ${postRow.player_name ?? "TBD"} flagged as ${postRow.category} by Neeko model this round. Projection looking solid. Worth a look before lockout.`,
+          tiktok: {
+            hook: `${postRow.category} alert: ${postRow.player_name ?? "TBD"} is your edge this round.`,
+            caption: `Quick ${postRow.category} pick breakdown — ${postRow.player_name ?? "TBD"} this round. Full data at Neeko Sports.`,
+            hashtags: ["#AFLFantasy", "#NeekoSports", "#AFL", "#FantasyTips"],
+            cta: "Full breakdown — link in bio.",
+          },
+          instagram: {
+            hook: `${postRow.player_name ?? "TBD"} is your ${postRow.category} edge this week.`,
+            caption: `${postRow.player_name ?? "TBD"} (${postRow.team ?? "AFL"}) — ${postRow.category} pick of the week. Full analysis at Neeko Sports — link in bio.`,
+            hashtags: ["#AFLFantasy", "#NeekoSports", "#AFL", "#FantasyFootball"],
+            carousel_text: "",
+          },
+          reddit: {
+            title: `[Data] ${postRow.player_name ?? "TBD"} flagged as ${postRow.category} by Neeko model this round`,
+            body: `Neeko model has flagged ${postRow.player_name ?? "TBD"} (${postRow.team ?? "AFL"}) as a ${postRow.category} pick this round. Projection looking solid. Worth a look before lockout — anyone else seeing this?`,
+          },
         },
         ctas: [
           "Get the full analysis at Neeko Sports — link in bio.",

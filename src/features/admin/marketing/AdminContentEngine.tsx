@@ -287,11 +287,30 @@ function AISummaryTabContent({ playerId }: { playerId: number | null }) {
 
 // ── PLATFORM VARIANTS TAB ─────────────────────────────────────────────────────
 
+type TikTokVariant = { hook?: string; caption?: string; hashtags?: string[]; cta?: string };
+type InstagramVariant = { hook?: string; caption?: string; hashtags?: string[]; carousel_text?: string };
+type RedditVariant = { title?: string; body?: string };
+type AnyVariant = TikTokVariant | InstagramVariant | RedditVariant | string;
+
+function extractCopyText(key: string, v: AnyVariant): string {
+  if (typeof v === "string") return v;
+  if (key === "reddit") {
+    const r = v as RedditVariant;
+    return [r.title, r.body].filter(Boolean).join("\n\n");
+  }
+  if (key === "instagram") {
+    const ig = v as InstagramVariant;
+    return [ig.hook, ig.caption, ig.carousel_text, ...(ig.hashtags ?? [])].filter(Boolean).join("\n\n");
+  }
+  const tk = v as TikTokVariant;
+  return [tk.hook, tk.caption, ...(tk.hashtags ?? []), tk.cta].filter(Boolean).join("\n\n");
+}
+
 function PlatformVariantsTabContent({ post }: { post: WeeklyContentPost }) {
   const { copied, copy } = useCopy();
-  const variants = post.platform_variants as Record<string, { caption?: string; hook?: string; hashtags?: string[] }> | null;
+  const variants = post.platform_variants as Record<string, AnyVariant> | null;
 
-  if (!variants) {
+  if (!variants || Object.keys(variants).length === 0) {
     return (
       <div className="p-4 text-center">
         <Smartphone className="h-6 w-6 text-muted-foreground/40 mx-auto mb-2" />
@@ -300,10 +319,10 @@ function PlatformVariantsTabContent({ post }: { post: WeeklyContentPost }) {
     );
   }
 
-  const platforms = [
-    { key: "tiktok",     label: "TikTok",     Icon: Play },
-    { key: "instagram",  label: "Instagram",  Icon: Image },
-    { key: "reddit",     label: "Reddit",     Icon: MessageCircle },
+  const platforms: { key: string; label: string; Icon: React.ElementType }[] = [
+    { key: "tiktok",    label: "TikTok",    Icon: Play },
+    { key: "instagram", label: "Instagram", Icon: Image },
+    { key: "reddit",    label: "Reddit",    Icon: MessageCircle },
   ];
 
   return (
@@ -311,7 +330,10 @@ function PlatformVariantsTabContent({ post }: { post: WeeklyContentPost }) {
       {platforms.map(({ key, label, Icon }) => {
         const v = variants[key];
         if (!v) return null;
-        const text = [v.hook, v.caption, ...(v.hashtags ?? [])].filter(Boolean).join("\n\n");
+
+        const copyText = extractCopyText(key, v);
+        const isString = typeof v === "string";
+
         return (
           <div key={key} className="border border-border rounded-lg overflow-hidden">
             <div className="flex items-center justify-between px-3 py-2 bg-muted/20 border-b border-border">
@@ -320,17 +342,63 @@ function PlatformVariantsTabContent({ post }: { post: WeeklyContentPost }) {
                 <span className="text-xs font-semibold">{label}</span>
               </div>
               <button
-                onClick={() => copy(text, key)}
+                onClick={() => copy(copyText, key)}
                 className="flex items-center gap-1 px-2 py-1 text-[10px] border border-border rounded hover:bg-accent transition-colors"
               >
                 {copied === key ? <><Check className="h-3 w-3 text-emerald-500" /> Copied</> : <><Copy className="h-3 w-3" /> Copy</>}
               </button>
             </div>
+
             <div className="p-3 space-y-2">
-              {v.hook && <p className="text-xs font-semibold leading-snug">{v.hook}</p>}
-              {v.caption && <p className="text-xs text-muted-foreground leading-relaxed">{v.caption}</p>}
-              {v.hashtags && v.hashtags.length > 0 && (
-                <p className="text-[10px] text-blue-600 dark:text-blue-400 font-mono">{v.hashtags.join(" ")}</p>
+              {isString ? (
+                <p className="text-xs text-muted-foreground leading-relaxed">{v as string}</p>
+              ) : key === "reddit" ? (
+                <>
+                  {(v as RedditVariant).title && (
+                    <p className="text-xs font-semibold leading-snug">{(v as RedditVariant).title}</p>
+                  )}
+                  {(v as RedditVariant).body && (
+                    <p className="text-xs text-muted-foreground leading-relaxed">{(v as RedditVariant).body}</p>
+                  )}
+                </>
+              ) : key === "instagram" ? (
+                <>
+                  {(v as InstagramVariant).hook && (
+                    <p className="text-xs font-semibold leading-snug">{(v as InstagramVariant).hook}</p>
+                  )}
+                  {(v as InstagramVariant).caption && (
+                    <p className="text-xs text-muted-foreground leading-relaxed">{(v as InstagramVariant).caption}</p>
+                  )}
+                  {(v as InstagramVariant).carousel_text && (
+                    <p className="text-[10px] text-muted-foreground/70 italic border-t border-border/40 pt-1.5">
+                      Carousel: {(v as InstagramVariant).carousel_text}
+                    </p>
+                  )}
+                  {(v as InstagramVariant).hashtags && (v as InstagramVariant).hashtags!.length > 0 && (
+                    <p className="text-[10px] text-blue-600 dark:text-blue-400 font-mono">
+                      {(v as InstagramVariant).hashtags!.join(" ")}
+                    </p>
+                  )}
+                </>
+              ) : (
+                <>
+                  {(v as TikTokVariant).hook && (
+                    <p className="text-xs font-semibold leading-snug">{(v as TikTokVariant).hook}</p>
+                  )}
+                  {(v as TikTokVariant).caption && (
+                    <p className="text-xs text-muted-foreground leading-relaxed">{(v as TikTokVariant).caption}</p>
+                  )}
+                  {(v as TikTokVariant).hashtags && (v as TikTokVariant).hashtags!.length > 0 && (
+                    <p className="text-[10px] text-blue-600 dark:text-blue-400 font-mono">
+                      {(v as TikTokVariant).hashtags!.join(" ")}
+                    </p>
+                  )}
+                  {(v as TikTokVariant).cta && (
+                    <p className="text-[10px] text-emerald-600 dark:text-emerald-400 font-medium border-t border-border/40 pt-1.5">
+                      {(v as TikTokVariant).cta}
+                    </p>
+                  )}
+                </>
               )}
             </div>
           </div>
