@@ -1,5 +1,4 @@
 import posthog from "posthog-js";
-import { supabase } from "@/lib/supabaseClient";
 
 const SESSION_KEY = "neeko_session_id";
 
@@ -41,35 +40,7 @@ export function track(event: string, properties?: Record<string, unknown>) {
   logEvent(event, properties);
 }
 
-export function logEvent(event: string, properties?: Record<string, unknown>) {
-  if (typeof window === "undefined") return;
-
-  const session_id = getSessionId();
-  const page = window.location.pathname;
-
-  try {
-    supabase.auth.getSession().then(({ data }) => {
-      if (!data.session) return;
-
-      supabase
-        .schema("analytics" as never)
-        .from("events" as never)
-        .insert({
-          event_name: event,
-          session_id,
-          page,
-          metadata: properties ?? {},
-        } as never)
-        .then(({ error }: { error: { message: string } | null }) => {
-          if (error && !error.message?.includes("406")) {
-            console.warn("[analytics] logEvent failed:", error.message);
-          }
-        })
-        .catch(() => {});
-    });
-  } catch {
-    // silently ignore analytics failures
-  }
+export function logEvent(_event: string, _properties?: Record<string, unknown>) {
 }
 
 export function identifyUser(user: { id: string; email?: string }) {
