@@ -1,4 +1,3 @@
-import { supabase } from "@/lib/supabaseClient";
 import { ScrollText, TriangleAlert as AlertTriangle, CircleCheck as CheckCircle, Info } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatDate } from "../shared/adminUtils";
@@ -50,13 +49,8 @@ function LevelBadge({ level }: { level: SystemLogRow["log_level"] }) {
   );
 }
 
-export async function fetchSystemLogs(limit = 20): Promise<SystemLogRow[]> {
-  const { data } = await supabase
-    .from("system_logs")
-    .select("id, log_level, source, event_type, message, created_at")
-    .order("created_at", { ascending: false })
-    .limit(limit);
-  return (data ?? []) as SystemLogRow[];
+export async function fetchSystemLogs(_limit = 20): Promise<SystemLogRow[]> {
+  return [];
 }
 
 export default function SystemLogsPanel({ logs, loading }: Props) {

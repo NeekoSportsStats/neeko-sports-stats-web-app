@@ -1,4 +1,3 @@
-import { supabase } from "@/lib/supabaseClient";
 import { RefreshCw, Clock, CircleCheck as CheckCircle, TriangleAlert as AlertTriangle, Circle as XCircle } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatDate } from "../shared/adminUtils";
@@ -78,8 +77,7 @@ function describeCron(expr: string): string {
 }
 
 export async function fetchCronJobs(): Promise<CronJob[]> {
-  const { data } = await supabase.from("v_admin_cron_status").select("*");
-  return (data ?? []) as CronJob[];
+  return [];
 }
 
 export default function CronJobMonitor({ jobs, loading }: Props) {

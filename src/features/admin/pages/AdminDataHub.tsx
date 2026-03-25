@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect } from "react";
-import { supabase } from "@/lib/supabaseClient";
+import { fetchAdminDashboardData } from "@/lib/adminApi";
 import { runCommand } from "@/hooks/useAdminCommand";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -102,13 +102,10 @@ export default function AdminDataHub() {
   const fetchAll = useCallback(async () => {
     setLoading(true);
     try {
-      const { data } = await supabase
-        .from("v_command_center_status")
-        .select("*")
-        .maybeSingle();
-      if (data) setStatus(data as CommandCenterStatus);
+      const data = await fetchAdminDashboardData("status");
+      if (data.status) setStatus(data.status as CommandCenterStatus);
       setLastRefreshed(new Date());
-    } finally {
+    } catch { /* silent */ } finally {
       setLoading(false);
     }
   }, []);

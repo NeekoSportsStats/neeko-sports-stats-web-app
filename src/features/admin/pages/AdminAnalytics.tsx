@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from "react";
-import { supabase } from "@/lib/supabaseClient";
+import { fetchAdminDashboardData } from "@/lib/adminApi";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -87,12 +87,9 @@ export default function AdminAnalytics() {
   const fetchLiveFunnel = useCallback(async () => {
     setLiveFunnelLoading(true);
     try {
-      const { data, error } = await supabase.rpc("get_analytics_funnel_7d" as never);
-      if (!error && data) {
-        const row = Array.isArray(data) ? data[0] : data;
-        setLiveFunnel(row ?? null);
-      }
-    } finally {
+      const data = await fetchAdminDashboardData("analytics_funnel");
+      if (data.live_funnel) setLiveFunnel(data.live_funnel as typeof liveFunnel);
+    } catch { /* silent */ } finally {
       setLiveFunnelLoading(false);
     }
   }, []);
@@ -100,13 +97,17 @@ export default function AdminAnalytics() {
   const fetchAnalytics = useCallback(async () => {
     setAnalyticsLoading(true);
     try {
-      const [res24h, res7d] = await Promise.all([
-        supabase.from("v_admin_analytics_summary").select("*").maybeSingle(),
-        supabase.from("v_admin_analytics_7d").select("*").maybeSingle(),
-      ]);
-      if (res24h.data) setAnalytics24h(res24h.data as AnalyticsSummary);
-      if (res7d.data) setAnalytics7d(res7d.data as AnalyticsSummary7d);
-    } finally {
+      const data = await fetchAdminDashboardData("analytics_usage");
+      if (data.analytics_24h) setAnalytics24h(data.analytics_24h as AnalyticsSummary);
+      if (data.analytics_7d) setAnalytics7d(data.analytics_7d as AnalyticsSummary7d);
+      if (data.unique_visitors_24h) setUniqueVisitors24h(data.unique_visitors_24h as UniqueVisitors24h);
+      if (data.live_users) setLiveUsers(data.live_users as LiveUsers);
+      if (data.mau) setMau(data.mau as MAU);
+      if (Array.isArray(data.top_pages_7d)) setTopPages(data.top_pages_7d as TopPageRow[]);
+      if (data.conversion_funnel_30d) setFunnelV2(data.conversion_funnel_30d as ConversionFunnelV2);
+      if (data.market_watch_usage_7d) setMarketWatchUsage(data.market_watch_usage_7d as MarketWatchUsage);
+      if (Array.isArray(data.analytics_daily)) setAnalyticsDaily(data.analytics_daily as AnalyticsDailyRow[]);
+    } catch { /* silent */ } finally {
       setAnalyticsLoading(false);
     }
   }, []);
@@ -114,71 +115,34 @@ export default function AdminAnalytics() {
   const fetchProductMetrics = useCallback(async () => {
     setProductMetricsLoading(true);
     try {
-      const [subRes, dauRes, wauRes, featureRes, funnelRes, aiRes, powerRes, realtimeRes, dailyRes] = await Promise.all([
-        supabase.from("v_admin_subscription_metrics").select("*").maybeSingle(),
-        supabase.from("v_admin_dau").select("*").maybeSingle(),
-        supabase.from("v_admin_wau").select("*").maybeSingle(),
-        supabase.from("v_admin_feature_usage").select("*").limit(10),
-        supabase.from("v_admin_conversion_funnel").select("*").maybeSingle(),
-        supabase.from("v_admin_ai_usage").select("*").maybeSingle(),
-        supabase.from("v_admin_start_sit_power_users").select("*").limit(20),
-        supabase.from("v_admin_realtime_users").select("*").maybeSingle(),
-        supabase.from("v_admin_daily_usage").select("*").limit(14),
-      ]);
-      if (subRes.data) setSubMetrics(subRes.data as SubscriptionMetrics);
-      if (dauRes.data) setDau(dauRes.data as DAU);
-      if (wauRes.data) setWau(wauRes.data as WAU);
-      if (featureRes.data) setFeatureUsage(featureRes.data as FeatureUsageRow[]);
-      if (funnelRes.data) setFunnel(funnelRes.data as ConversionFunnel);
-      if (aiRes.data) setAiUsage(aiRes.data as AIUsage);
-      if (powerRes.data) setPowerUsers(powerRes.data as PowerUser[]);
-      if (realtimeRes.data) setRealtimeUsers(realtimeRes.data as RealtimeUsers);
-      if (dailyRes.data) setDailyUsage(dailyRes.data as DailyUsageRow[]);
-    } finally {
+      const data = await fetchAdminDashboardData("analytics_product");
+      if (data.subscription_metrics) setSubMetrics(data.subscription_metrics as SubscriptionMetrics);
+      if (data.dau) setDau(data.dau as DAU);
+      if (data.wau) setWau(data.wau as WAU);
+      if (Array.isArray(data.feature_usage)) setFeatureUsage(data.feature_usage as FeatureUsageRow[]);
+      if (data.conversion_funnel) setFunnel(data.conversion_funnel as ConversionFunnel);
+      if (data.ai_usage) setAiUsage(data.ai_usage as AIUsage);
+      if (Array.isArray(data.power_users)) setPowerUsers(data.power_users as PowerUser[]);
+      if (data.realtime_users) setRealtimeUsers(data.realtime_users as RealtimeUsers);
+      if (Array.isArray(data.daily_usage)) setDailyUsage(data.daily_usage as DailyUsageRow[]);
+    } catch { /* silent */ } finally {
       setProductMetricsLoading(false);
     }
   }, []);
 
   const fetchV2Metrics = useCallback(async () => {
-    setV2MetricsLoading(true);
-    try {
-      const [uvRes, liveRes, mauRes, pagesRes, funnelRes, mwRes, adRes] = await Promise.all([
-        supabase.schema("admin" as never).from("v_unique_visitors_24h").select("*").maybeSingle(),
-        supabase.schema("admin" as never).from("v_live_users").select("*").maybeSingle(),
-        supabase.schema("admin" as never).from("v_mau").select("*").maybeSingle(),
-        supabase.schema("admin" as never).from("v_top_pages_7d").select("*").limit(20),
-        supabase.schema("admin" as never).from("v_conversion_funnel_30d").select("*").maybeSingle(),
-        supabase.schema("admin" as never).from("v_market_watch_usage_7d").select("*").maybeSingle(),
-        supabase.schema("admin" as never).from("v_analytics_daily").select("*").limit(30),
-      ]);
-      if (uvRes.data) setUniqueVisitors24h(uvRes.data as UniqueVisitors24h);
-      if (liveRes.data) setLiveUsers(liveRes.data as LiveUsers);
-      if (mauRes.data) setMau(mauRes.data as MAU);
-      if (pagesRes.data) setTopPages(pagesRes.data as TopPageRow[]);
-      if (funnelRes.data) setFunnelV2(funnelRes.data as ConversionFunnelV2);
-      if (mwRes.data) setMarketWatchUsage(mwRes.data as MarketWatchUsage);
-      if (adRes.data) setAnalyticsDaily(adRes.data as AnalyticsDailyRow[]);
-    } finally {
-      setV2MetricsLoading(false);
-    }
   }, []);
 
   const fetchGrowthMetrics = useCallback(async () => {
     setGrowthLoading(true);
     try {
-      const [signupRes, signupDailyRes, utmRes, playersRes, revenueRes] = await Promise.all([
-        supabase.schema("admin" as never).from("v_signups_7d").select("*").maybeSingle(),
-        supabase.schema("admin" as never).from("v_signups_daily").select("*").limit(30),
-        supabase.schema("admin" as never).from("v_utm_traffic_sources_7d").select("*").limit(20),
-        supabase.schema("admin" as never).from("v_top_viewed_players_7d").select("*").limit(20),
-        supabase.schema("admin" as never).from("v_revenue_estimate").select("*").maybeSingle(),
-      ]);
-      if (signupRes.data) setSignupMetrics(signupRes.data as SignupMetrics);
-      if (signupDailyRes.data) setSignupDaily(signupDailyRes.data as SignupDailyRow[]);
-      if (utmRes.data) setUtmSources(utmRes.data as UTMSourceRow[]);
-      if (playersRes.data) setTopPlayers(playersRes.data as TopPlayerRow[]);
-      if (revenueRes.data) setRevenueEstimate(revenueRes.data as RevenueEstimate);
-    } finally {
+      const data = await fetchAdminDashboardData("analytics_growth");
+      if (data.signup_metrics) setSignupMetrics(data.signup_metrics as SignupMetrics);
+      if (Array.isArray(data.signup_daily)) setSignupDaily(data.signup_daily as SignupDailyRow[]);
+      if (Array.isArray(data.utm_sources)) setUtmSources(data.utm_sources as UTMSourceRow[]);
+      if (Array.isArray(data.top_players)) setTopPlayers(data.top_players as TopPlayerRow[]);
+      if (data.revenue_estimate) setRevenueEstimate(data.revenue_estimate as RevenueEstimate);
+    } catch { /* silent */ } finally {
       setGrowthLoading(false);
     }
   }, []);

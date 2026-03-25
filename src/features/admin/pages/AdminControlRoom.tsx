@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { supabase } from "@/lib/supabaseClient";
+import { fetchAdminDashboardData } from "@/lib/adminApi";
 import { runCommand } from "@/hooks/useAdminCommand";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
@@ -396,13 +396,10 @@ export default function AdminControlRoom() {
   const fetchAll = useCallback(async () => {
     setLoading(true);
     try {
-      const { data } = await supabase
-        .from("v_command_center_status")
-        .select("*")
-        .maybeSingle();
-      if (data) setStatus(data as CommandCenterStatus);
+      const data = await fetchAdminDashboardData("status");
+      if (data.status) setStatus(data.status as CommandCenterStatus);
       setLastRefreshed(new Date());
-    } finally {
+    } catch { /* silent */ } finally {
       setLoading(false);
     }
   }, []);

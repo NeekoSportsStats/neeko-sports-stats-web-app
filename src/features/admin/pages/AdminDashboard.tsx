@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { supabase } from "@/lib/supabaseClient";
+import { fetchAdminDashboardData } from "@/lib/adminApi";
 import { runCommand } from "@/hooks/useAdminCommand";
 import { useAdminUIState } from "@/features/admin/state/AdminUIStateContext";
 import { Button } from "@/components/ui/button";
@@ -200,14 +200,9 @@ export default function AdminDashboard() {
   const fetchAll = useCallback(async () => {
     setLoading(true);
     try {
-      const [statusRes, runsRes] = await Promise.allSettled([
-        supabase.from("v_command_center_status").select("*").maybeSingle(),
-        supabase.from("v_pipeline_run_detail").select("*").order("started_at", { ascending: false }).limit(8),
-      ]);
-      if (statusRes.status === "fulfilled" && statusRes.value.data)
-        setStatus(statusRes.value.data as CommandCenterStatus);
-      if (runsRes.status === "fulfilled" && runsRes.value.data)
-        setRuns(runsRes.value.data as RunRow[]);
+      const data = await fetchAdminDashboardData("status");
+      if (data.status) setStatus(data.status as CommandCenterStatus);
+      if (Array.isArray(data.pipeline_runs)) setRuns(data.pipeline_runs as RunRow[]);
       setLastRefreshed(new Date());
     } finally {
       setLoading(false);

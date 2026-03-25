@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { supabase } from "@/lib/supabaseClient";
+import { callFounderTasks } from "@/lib/adminApi";
 import { useToast } from "@/hooks/use-toast";
 import { RefreshCw, Plus, SquareCheck as CheckSquare, Square, Trash2, Pencil, Check, X, ListTodo, ChevronDown, ChevronRight } from "lucide-react";
 
@@ -301,12 +301,8 @@ export default function AdminFounderTasks() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase
-        .from("founder_tasks")
-        .select("id, task_text, priority, completed, created_at")
-        .order("created_at", { ascending: false });
-      if (error) throw error;
-      setTasks((data ?? []) as Task[]);
+      const result = await callFounderTasks("list");
+      setTasks((Array.isArray(result.tasks) ? result.tasks : []) as Task[]);
     } catch (err) {
       toast({ title: "Failed to load tasks", description: err instanceof Error ? err.message : "Unknown error", variant: "destructive" });
     } finally {
@@ -335,13 +331,10 @@ export default function AdminFounderTasks() {
     setNewText("");
     setTimeout(() => inputRef.current?.focus(), 50);
     try {
-      const { data, error } = await supabase
-        .from("founder_tasks")
-        .insert({ task_text: text, priority, completed: false })
-        .select("id, task_text, priority, completed, created_at")
-        .single();
-      if (error) throw error;
-      setTasks((prev) => prev.map((t) => t.id === optimisticId ? (data as Task) : t));
+      const result = await callFounderTasks("add", { task_text: text, priority });
+      if (result.task) {
+        setTasks((prev) => prev.map((t) => t.id === optimisticId ? (result.task as Task) : t));
+      }
       toast({ title: "Task added" });
     } catch (err) {
       setTasks((prev) => prev.filter((t) => t.id !== optimisticId));
@@ -362,8 +355,7 @@ export default function AdminFounderTasks() {
     }
     setTasks((prev) => prev.map((t) => t.id === task.id ? { ...t, completed: next } : t));
     try {
-      const { error } = await supabase.from("founder_tasks").update({ completed: next }).eq("id", task.id);
-      if (error) throw error;
+      await callFounderTasks("toggle", { id: task.id, completed: next });
       toast({ title: next ? "Task completed" : "Task reopened" });
     } catch (err) {
       setTasks((prev) => prev.map((t) => t.id === task.id ? { ...t, completed: !next } : t));
@@ -391,8 +383,7 @@ export default function AdminFounderTasks() {
     setTasks((prev) => prev.map((t) => t.id === id ? { ...t, task_text: text, priority: editPriority } : t));
     setEditingId(null);
     try {
-      const { error } = await supabase.from("founder_tasks").update({ task_text: text, priority: editPriority }).eq("id", id);
-      if (error) throw error;
+      await callFounderTasks("edit", { id, task_text: text, priority: editPriority });
       toast({ title: "Task updated" });
     } catch (err) {
       toast({ title: "Failed to save", description: err instanceof Error ? err.message : "Unknown error", variant: "destructive" });
@@ -408,8 +399,7 @@ export default function AdminFounderTasks() {
     setAnimatingOutId(null);
     setTasks((prev) => prev.filter((t) => t.id !== id));
     try {
-      const { error } = await supabase.from("founder_tasks").delete().eq("id", id);
-      if (error) throw error;
+      await callFounderTasks("delete", { id });
       toast({ title: "Task deleted" });
     } catch (err) {
       load();

@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/lib/auth";
 import { supabase } from "@/lib/supabaseClient";
+import { fetchPipelineRuns, fetchPipelineSteps } from "@/lib/adminApi";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -109,13 +110,12 @@ function RunCard({ run }: { run: PipelineRunRow }) {
   const loadSteps = useCallback(async () => {
     if (steps.length > 0) return;
     setLoadingSteps(true);
-    const { data } = await supabase
-      .from("pipeline_steps")
-      .select("*")
-      .eq("run_id", run.id)
-      .order("started_at", { ascending: true });
-    if (data) setSteps(data as PipelineStepRow[]);
-    setLoadingSteps(false);
+    try {
+      const result = await fetchPipelineSteps(run.id);
+      if (Array.isArray(result.pipeline_steps)) setSteps(result.pipeline_steps as PipelineStepRow[]);
+    } catch { /* silent */ } finally {
+      setLoadingSteps(false);
+    }
   }, [run.id, steps.length]);
 
   const handleToggle = () => {
@@ -215,13 +215,12 @@ export default function PipelineHistory() {
 
   const fetchRuns = useCallback(async () => {
     setRunsLoading(true);
-    const { data } = await supabase
-      .from("v_pipeline_run_detail")
-      .select("*")
-      .order("started_at", { ascending: false })
-      .limit(50);
-    if (data) setRuns(data as PipelineRunRow[]);
-    setRunsLoading(false);
+    try {
+      const result = await fetchPipelineRuns();
+      if (Array.isArray(result.pipeline_runs)) setRuns(result.pipeline_runs as PipelineRunRow[]);
+    } catch { /* silent */ } finally {
+      setRunsLoading(false);
+    }
   }, []);
 
   useEffect(() => {

@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect } from "react";
-import { supabase } from "@/lib/supabaseClient";
+import { fetchAdminDashboardData } from "@/lib/adminApi";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -443,14 +443,9 @@ export default function AdminCommandCenter() {
   const fetchCommandLogs = useCallback(async () => {
     setLogsLoading(true);
     try {
-      const { data } = await supabase
-        .schema("admin" as never)
-        .from("command_logs" as never)
-        .select("id,command,status,duration_ms,error,created_at")
-        .order("created_at", { ascending: false })
-        .limit(30);
-      if (data) setCommandLogs(data as CommandLogRow[]);
-    } finally {
+      const result = await fetchAdminDashboardData("command_logs");
+      if (Array.isArray(result.command_logs)) setCommandLogs(result.command_logs as CommandLogRow[]);
+    } catch { /* silent */ } finally {
       setLogsLoading(false);
     }
   }, []);
@@ -458,18 +453,19 @@ export default function AdminCommandCenter() {
   const fetchAll = useCallback(async () => {
     setLoading(true);
     try {
-      const [statusRes, cronRes, logsRes] = await Promise.allSettled([
-        supabase.from("v_command_center_status").select("*").maybeSingle(),
-        fetchCronJobs(),
-        fetchSystemLogs(20),
+      const [statusResult, healthResult] = await Promise.allSettled([
+        fetchAdminDashboardData("status"),
+        fetchAdminDashboardData("health"),
       ]);
-      if (statusRes.status === "fulfilled" && statusRes.value.data) {
-        setStatus(statusRes.value.data as CommandCenterStatus);
+      if (statusResult.status === "fulfilled" && statusResult.value.status) {
+        setStatus(statusResult.value.status as CommandCenterStatus);
       }
-      if (cronRes.status === "fulfilled") setCronJobs(cronRes.value);
-      if (logsRes.status === "fulfilled") setLogs(logsRes.value);
+      if (healthResult.status === "fulfilled") {
+        if (Array.isArray(healthResult.value.cron_status)) setCronJobs(healthResult.value.cron_status as CronJob[]);
+        if (Array.isArray(healthResult.value.system_logs)) setLogs(healthResult.value.system_logs as SystemLogRow[]);
+      }
       setLastRefreshed(new Date());
-    } finally {
+    } catch { /* silent */ } finally {
       setLoading(false);
     }
   }, []);

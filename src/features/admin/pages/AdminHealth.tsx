@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect } from "react";
 import { useSystemHealth, PipelineStep, RecentError } from "@/hooks/useSystemHealth";
-import { supabase } from "@/lib/supabaseClient";
+import { fetchAdminDashboardData } from "@/lib/adminApi";
 import { runCommand } from "@/hooks/useAdminCommand";
 import { useAdminUIState } from "@/features/admin/state/AdminUIStateContext";
 import { Button } from "@/components/ui/button";
@@ -612,9 +612,10 @@ export default function AdminHealth() {
   const fetchIdentityIssues = useCallback(async () => {
     setIdentityLoading(true);
     try {
-      const { data } = await supabase.schema("admin").from("v_player_identity_issues").select("*").limit(50);
-      if (data) setIdentityIssues(data as PlayerIdentityIssue[]);
-    } finally {
+      const result = await fetchAdminDashboardData("health");
+      const issues = result.player_identity_issues;
+      if (Array.isArray(issues)) setIdentityIssues(issues as PlayerIdentityIssue[]);
+    } catch { /* silent */ } finally {
       setIdentityLoading(false);
     }
   }, []);
@@ -622,21 +623,14 @@ export default function AdminHealth() {
   const fetchPipelineData = useCallback(async () => {
     setPipelineLoading(true);
     try {
-      const [runsRes, healthRes, aiRes, ssRes, cmdRes, cronRes] = await Promise.allSettled([
-        supabase.from("v_pipeline_run_detail").select("*").order("started_at", { ascending: false }).limit(20),
-        supabase.from("v_pipeline_health").select("*").maybeSingle(),
-        supabase.from("v_ai_worker_health").select("*").maybeSingle(),
-        supabase.from("v_start_sit_cache_health").select("*").maybeSingle(),
-        supabase.from("v_command_center_status").select("*").maybeSingle(),
-        supabase.rpc("get_cron_job_status"),
-      ]);
-      if (runsRes.status === "fulfilled" && runsRes.value.data) setPipelineRuns(runsRes.value.data as PipelineRunRow[]);
-      if (healthRes.status === "fulfilled" && healthRes.value.data) setPipelineHealth(healthRes.value.data as PipelineHealth);
-      if (aiRes.status === "fulfilled" && aiRes.value.data) setAiWorker(aiRes.value.data as AIWorkerHealth);
-      if (ssRes.status === "fulfilled" && ssRes.value.data) setStartSitCache(ssRes.value.data as StartSitCacheHealth);
-      if (cmdRes.status === "fulfilled" && cmdRes.value.data) setCmdStatus(cmdRes.value.data as CommandCenterStatus);
-      if (cronRes.status === "fulfilled" && cronRes.value.data) setCronJobs(cronRes.value.data as CronJobRow[]);
-    } finally {
+      const result = await fetchAdminDashboardData("health");
+      if (Array.isArray(result.pipeline_run_detail)) setPipelineRuns(result.pipeline_run_detail as PipelineRunRow[]);
+      if (result.pipeline_health) setPipelineHealth(result.pipeline_health as PipelineHealth);
+      if (result.ai_worker_health) setAiWorker(result.ai_worker_health as AIWorkerHealth);
+      if (result.start_sit_cache_health) setStartSitCache(result.start_sit_cache_health as StartSitCacheHealth);
+      if (result.status) setCmdStatus(result.status as CommandCenterStatus);
+      if (Array.isArray(result.cron_jobs)) setCronJobs(result.cron_jobs as CronJobRow[]);
+    } catch { /* silent */ } finally {
       setPipelineLoading(false);
     }
   }, []);
