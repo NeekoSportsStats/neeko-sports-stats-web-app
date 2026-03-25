@@ -113,49 +113,94 @@ function getWeekStartDate(): string {
   return monday.toISOString().split("T")[0];
 }
 
+const VALUE_MIN_VALUE_SCORE = 5;
+const VALUE_MAX_BUST_RISK = 6;
+const TRAP_MAX_VALUE_SCORE = 4;
+const TRAP_MIN_BUST_RISK = 6;
+const BREAKOUT_MIN_UPSIDE = 8;
+const BREAKOUT_MIN_FORM = 55;
+
+type PostSelection = {
+  player_id: number;
+  player_name: string;
+  team: string;
+  category: string;
+  angle: string;
+  content_type: string;
+  player2_id: number | null;
+  player2_name: string | null;
+};
+
+function pickFresh(
+  pool: PlayerData[],
+  usedPlayerIds: Set<number>,
+): PlayerData | undefined {
+  return pool.find(p => !usedPlayerIds.has(p.player_id));
+}
+
 function selectPlayersForDay(
   players: PlayerData[],
   proofPlayers: ProofPlayer[],
   dayIndex: number,
   usedPlayerIds: Set<number>,
-): { player_id: number; player_name: string; team: string; category: string; angle: string; content_type: string; player2_id: number | null; player2_name: string | null }[] {
+): PostSelection[] {
   const config = DAY_CONFIGS[dayIndex];
-  const available = players.filter(p => !usedPlayerIds.has(p.player_id));
-  // rank field now stores neeko_rating_scaled — higher is better, so sort descending
-  const sorted = [...available].sort((a, b) => b.rank - a.rank);
 
-  const valuePlayers = [...sorted].sort((a, b) => b.value_score - a.value_score);
-  const breakoutPlayers = [...sorted].filter(p => p.upside_pct >= 10 || p.form_score >= 60).sort((a, b) => b.upside_pct - a.upside_pct);
-  const trapPlayers = sorted.filter(p => p.value_score < 5 && p.rank <= 30);
-  const captainPlayers = [...sorted].sort((a, b) => b.captain_score - a.captain_score);
+  const available = () => players.filter(p => !usedPlayerIds.has(p.player_id));
 
-  const posts = [];
+  const byRank = () => [...available()].sort((a, b) => b.rank - a.rank);
+  const byValue = () => [...available()].filter(p =>
+    p.value_score >= VALUE_MIN_VALUE_SCORE && p.risk_rating <= VALUE_MAX_BUST_RISK
+  ).sort((a, b) => b.value_score - a.value_score);
+  const byBreakout = () => [...available()].filter(p =>
+    (p.upside_pct >= BREAKOUT_MIN_UPSIDE || p.form_score >= BREAKOUT_MIN_FORM) &&
+    p.value_score >= VALUE_MIN_VALUE_SCORE
+  ).sort((a, b) => b.upside_pct - a.upside_pct);
+  const byTrap = () => [...available()].filter(p =>
+    p.value_score <= TRAP_MAX_VALUE_SCORE && p.risk_rating >= TRAP_MIN_BUST_RISK
+  ).sort((a, b) => b.risk_rating - a.risk_rating);
+  const byCaptain = () => [...available()].sort((a, b) => b.captain_score - a.captain_score);
 
-  for (let slot = 0; slot < 3; slot++) {
-    const category = config.categories[slot];
-    const angle = config.angles[slot];
-    const content_type = config.content_types[slot];
+  const CATEGORY_PRIORITY: Record<string, number> = {
+    Value: 1, Breakout: 2, Trap: 3, Top3: 0,
+    H2H: 1, Proof: 4, Injury: 4, Conversation: 2,
+  };
 
+  const slotsWithIndex = config.categories.map((cat, idx) => ({
+    cat, angle: config.angles[idx], content_type: config.content_types[idx], slotIndex: idx,
+  }));
+  const processingOrder = [...slotsWithIndex].sort(
+    (a, b) => (CATEGORY_PRIORITY[a.cat] ?? 5) - (CATEGORY_PRIORITY[b.cat] ?? 5)
+  );
+
+  const resultMap = new Map<number, PostSelection>();
+
+  for (const { cat, angle, content_type, slotIndex } of processingOrder) {
     let selectedPlayer: PlayerData | undefined;
     let player2: PlayerData | undefined;
 
-    if (category === "Top3") {
-      const topPlayers = captainPlayers.filter(p => !usedPlayerIds.has(p.player_id));
-      selectedPlayer = topPlayers[slot % topPlayers.length] || valuePlayers[0];
-    } else if (category === "H2H") {
-      const captains = captainPlayers.filter(p => !usedPlayerIds.has(p.player_id));
+    if (cat === "Top3") {
+      const topPool = byCaptain();
+      selectedPlayer = topPool[slotIndex % Math.max(topPool.length, 1)];
+    } else if (cat === "H2H") {
+      const captains = byCaptain();
       selectedPlayer = captains[0];
       player2 = captains[1];
       if (player2) usedPlayerIds.add(player2.player_id);
-    } else if (category === "Breakout") {
-      selectedPlayer = breakoutPlayers.find(p => !usedPlayerIds.has(p.player_id));
-    } else if (category === "Trap") {
-      selectedPlayer = trapPlayers.find(p => !usedPlayerIds.has(p.player_id));
-    } else if (category === "Proof") {
+    } else if (cat === "Value") {
+      selectedPlayer = pickFresh(byValue(), usedPlayerIds)
+        ?? pickFresh(byRank(), usedPlayerIds);
+    } else if (cat === "Breakout") {
+      selectedPlayer = pickFresh(byBreakout(), usedPlayerIds)
+        ?? pickFresh(byRank(), usedPlayerIds);
+    } else if (cat === "Trap") {
+      selectedPlayer = pickFresh(byTrap(), usedPlayerIds)
+        ?? pickFresh(byRank(), usedPlayerIds);
+    } else if (cat === "Proof") {
       const proofAvail = proofPlayers.filter(p => !usedPlayerIds.has(p.player_id));
       if (proofAvail.length > 0) {
         const pp = proofAvail[0];
-        selectedPlayer = players.find(p => p.player_id === pp.player_id) || {
+        selectedPlayer = players.find(p => p.player_id === pp.player_id) ?? {
           player_id: pp.player_id,
           player_name: pp.player_name,
           team: pp.team,
@@ -182,30 +227,28 @@ function selectPlayersForDay(
           games_played: 10,
         };
       } else {
-        selectedPlayer = valuePlayers.find(p => !usedPlayerIds.has(p.player_id));
+        selectedPlayer = pickFresh(byRank(), usedPlayerIds);
       }
-    } else if (category === "Injury") {
-      const injuredCandidate = sorted[0];
-      selectedPlayer = injuredCandidate;
-    } else if (category === "Conversation") {
-      selectedPlayer = valuePlayers.find(p => !usedPlayerIds.has(p.player_id));
+    } else if (cat === "Injury" || cat === "Conversation") {
+      selectedPlayer = pickFresh(byRank(), usedPlayerIds);
     } else {
-      selectedPlayer = valuePlayers.find(p => !usedPlayerIds.has(p.player_id));
+      selectedPlayer = pickFresh(byValue(), usedPlayerIds)
+        ?? pickFresh(byRank(), usedPlayerIds);
     }
 
     if (!selectedPlayer) {
-      selectedPlayer = valuePlayers[0] || sorted[0];
+      selectedPlayer = pickFresh(byRank(), usedPlayerIds) ?? players[0];
     }
 
     if (selectedPlayer && !usedPlayerIds.has(selectedPlayer.player_id)) {
       usedPlayerIds.add(selectedPlayer.player_id);
     }
 
-    posts.push({
+    resultMap.set(slotIndex, {
       player_id: selectedPlayer?.player_id ?? 0,
       player_name: selectedPlayer?.player_name ?? "TBD",
       team: selectedPlayer?.team ?? "TBD",
-      category,
+      category: cat,
       angle,
       content_type,
       player2_id: player2?.player_id ?? null,
@@ -213,7 +256,26 @@ function selectPlayersForDay(
     });
   }
 
-  return posts;
+  const posts: PostSelection[] = [];
+  for (let i = 0; i < 3; i++) {
+    posts.push(resultMap.get(i)!);
+  }
+
+  const dayPlayerIds = new Set<number>();
+  const safe = posts.map(post => {
+    if (dayPlayerIds.has(post.player_id)) {
+      const fallback = players.find(p => !usedPlayerIds.has(p.player_id) && !dayPlayerIds.has(p.player_id));
+      if (fallback) {
+        usedPlayerIds.add(fallback.player_id);
+        dayPlayerIds.add(fallback.player_id);
+        return { ...post, player_id: fallback.player_id, player_name: fallback.player_name, team: fallback.team };
+      }
+    }
+    if (post.player_id) dayPlayerIds.add(post.player_id);
+    return post;
+  });
+
+  return safe;
 }
 
 Deno.serve(async (req: Request) => {
