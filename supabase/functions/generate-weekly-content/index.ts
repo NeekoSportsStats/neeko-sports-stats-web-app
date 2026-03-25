@@ -34,6 +34,16 @@ interface PlayerData {
   games_played: number;
 }
 
+interface Top3Player {
+  player_id: number;
+  player_name: string;
+  team: string;
+  position: string;
+  projection: number;
+  ceiling: number;
+  value_score: number;
+}
+
 interface ProofPlayer {
   player_id: number;
   player_name: string;
@@ -43,13 +53,13 @@ interface ProofPlayer {
   accuracy_gap: number;
 }
 
-// ── WEEKLY STRUCTURE (fixed, per spec) ────────────────────────────────────────
+// ── WEEKLY STRUCTURE ──────────────────────────────────────────────────────────
 // Monday:    VALUE, TRAP, BREAKOUT
 // Tuesday:   BREAKOUT, VALUE, ENGAGEMENT
 // Wednesday: CONVERSATION, VALUE, BREAKOUT
 // Thursday:  INJURY, VALUE, TRAP
-// Friday:    TOP3, TOP3, TOP3  (only day with 3 Top3)
-// Saturday:  TOP3, TOP3, BREAKOUT
+// Friday:    TOP3, VALUE, BREAKOUT          ← ONE Top3 post (not 3)
+// Saturday:  TOP3, BREAKOUT, VALUE          ← ONE Top3 post
 // Sunday:    PROOF, PROOF, VALUE
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -85,16 +95,16 @@ const DAY_CONFIGS = [
   {
     label: "friday",
     display: "Friday",
-    categories: ["Top3", "Top3", "Top3"] as const,
-    angles: ["top3_friday", "top3_friday", "top3_friday"] as const,
-    content_types: ["Top 3 Post", "Top 3 Post", "Top 3 Post"] as const,
+    categories: ["Top3", "Value", "Breakout"] as const,
+    angles: ["top3_friday", "hidden_edge", "market_inefficiency"] as const,
+    content_types: ["Top 3 Post", "Graphic Post", "Short-form Video"] as const,
   },
   {
     label: "saturday",
     display: "Saturday",
-    categories: ["Top3", "Top3", "Breakout"] as const,
-    angles: ["top3_saturday", "top3_saturday", "market_inefficiency"] as const,
-    content_types: ["Top 3 Post", "Top 3 Post", "Short-form Video"] as const,
+    categories: ["Top3", "Breakout", "Value"] as const,
+    angles: ["top3_saturday", "market_inefficiency", "hidden_edge"] as const,
+    content_types: ["Top 3 Post", "Short-form Video", "Graphic Post"] as const,
   },
   {
     label: "sunday",
@@ -123,7 +133,6 @@ function getWeekStartDate(): string {
   return monday.toISOString().split("T")[0];
 }
 
-// ── CATEGORY FILTER CONSTANTS ─────────────────────────────────────────────────
 const VALUE_MIN_VALUE_SCORE = 5;
 const VALUE_MAX_BUST_RISK = 6;
 const TRAP_MAX_VALUE_SCORE = 4;
@@ -131,7 +140,6 @@ const TRAP_MIN_BUST_RISK = 6;
 const BREAKOUT_MIN_UPSIDE = 8;
 const BREAKOUT_MIN_FORM = 55;
 
-// Processing priority: lower = picked first (gets best players)
 const CATEGORY_PRIORITY: Record<string, number> = {
   Top3: 0,
   Value: 1,
@@ -143,6 +151,66 @@ const CATEGORY_PRIORITY: Record<string, number> = {
   Injury: 5,
 };
 
+// ── TOP3 PLAYER SELECTION ─────────────────────────────────────────────────────
+// Picks 3 players by projection DESC, value_score DESC.
+// Avoids duplicate positions and duplicate teams where possible.
+function selectTop3Players(
+  pool: PlayerData[],
+  globalUsedIds: Set<number>,
+): Top3Player[] {
+  const available = pool.filter(p => !globalUsedIds.has(p.player_id));
+
+  const sorted = [...available].sort((a, b) => {
+    if (b.projection !== a.projection) return b.projection - a.projection;
+    return b.value_score - a.value_score;
+  });
+
+  const picked: PlayerData[] = [];
+  const usedPositions = new Set<string>();
+  const usedTeams = new Set<string>();
+
+  // First pass: unique position + unique team
+  for (const p of sorted) {
+    if (picked.length >= 3) break;
+    if (!usedPositions.has(p.position) && !usedTeams.has(p.team)) {
+      picked.push(p);
+      usedPositions.add(p.position);
+      usedTeams.add(p.team);
+    }
+  }
+
+  // Second pass: allow duplicate position (still avoid same team)
+  if (picked.length < 3) {
+    for (const p of sorted) {
+      if (picked.length >= 3) break;
+      if (picked.some(x => x.player_id === p.player_id)) continue;
+      if (!usedTeams.has(p.team)) {
+        picked.push(p);
+        usedTeams.add(p.team);
+      }
+    }
+  }
+
+  // Third pass: fill from best remaining regardless
+  if (picked.length < 3) {
+    for (const p of sorted) {
+      if (picked.length >= 3) break;
+      if (picked.some(x => x.player_id === p.player_id)) continue;
+      picked.push(p);
+    }
+  }
+
+  return picked.slice(0, 3).map(p => ({
+    player_id: p.player_id,
+    player_name: p.player_name,
+    team: p.team,
+    position: p.position,
+    projection: p.projection,
+    ceiling: p.ceiling,
+    value_score: p.value_score,
+  }));
+}
+
 type PostSelection = {
   player_id: number;
   player_name: string;
@@ -152,6 +220,7 @@ type PostSelection = {
   content_type: string;
   player2_id: number | null;
   player2_name: string | null;
+  top3_players: Top3Player[] | null;
 };
 
 function pickFresh(
@@ -170,14 +239,11 @@ function selectPlayersForDay(
   const config = DAY_CONFIGS[dayIndex];
 
   const available = () => players.filter(p => !usedPlayerIds.has(p.player_id));
-
   const byRank = () => [...available()].sort((a, b) => b.rank - a.rank);
-
   const byValue = () =>
     [...available()]
       .filter(p => p.value_score >= VALUE_MIN_VALUE_SCORE && p.risk_rating <= VALUE_MAX_BUST_RISK)
       .sort((a, b) => b.value_score - a.value_score);
-
   const byBreakout = () =>
     [...available()]
       .filter(
@@ -186,15 +252,12 @@ function selectPlayersForDay(
           p.value_score >= VALUE_MIN_VALUE_SCORE,
       )
       .sort((a, b) => b.upside_pct - a.upside_pct);
-
   const byTrap = () =>
     [...available()]
       .filter(p => p.value_score <= TRAP_MAX_VALUE_SCORE && p.risk_rating >= TRAP_MIN_BUST_RISK)
       .sort((a, b) => b.risk_rating - a.risk_rating);
-
   const byCaptain = () => [...available()].sort((a, b) => b.captain_score - a.captain_score);
 
-  // Sort slots by priority so best-player-pools are consumed first
   const slotsWithIndex = config.categories.map((cat, idx) => ({
     cat,
     angle: config.angles[idx],
@@ -211,13 +274,21 @@ function selectPlayersForDay(
   for (const { cat, angle, content_type, slotIndex } of processingOrder) {
     let selectedPlayer: PlayerData | undefined;
     let player2: PlayerData | undefined;
+    let top3Players: Top3Player[] | null = null;
 
     if (cat === "Top3") {
-      const topPool = byCaptain();
-      // Use slotIndex to spread Top3 across different players on the same day
-      const dayTop3Count = [...resultMap.values()].filter(r => r.category === "Top3").length;
-      selectedPlayer = topPool[dayTop3Count] ?? topPool[0];
-      // For Top3, we mark as used only AFTER we record the result (shared pool logic below)
+      // Select 3 players for this single Top3 post
+      top3Players = selectTop3Players(players, usedPlayerIds);
+
+      // Mark all 3 as used globally
+      for (const p of top3Players) {
+        usedPlayerIds.add(p.player_id);
+      }
+
+      // Primary player is rank #1 for backward compat fields
+      const primary = top3Players[0];
+      selectedPlayer = players.find(p => p.player_id === primary?.player_id);
+
     } else if (cat === "H2H") {
       const captains = byCaptain();
       selectedPlayer = captains[0];
@@ -271,36 +342,40 @@ function selectPlayersForDay(
       selectedPlayer = pickFresh(byValue(), usedPlayerIds) ?? pickFresh(byRank(), usedPlayerIds);
     }
 
-    // Absolute fallback — always fill a slot
-    if (!selectedPlayer) {
+    if (!selectedPlayer && cat !== "Top3") {
       selectedPlayer = pickFresh(byRank(), usedPlayerIds) ?? players[0];
     }
 
-    if (selectedPlayer && !usedPlayerIds.has(selectedPlayer.player_id)) {
+    if (selectedPlayer && cat !== "Top3" && !usedPlayerIds.has(selectedPlayer.player_id)) {
       usedPlayerIds.add(selectedPlayer.player_id);
     }
 
+    const primaryPlayer = top3Players?.[0];
+
     resultMap.set(slotIndex, {
-      player_id: selectedPlayer?.player_id ?? 0,
-      player_name: selectedPlayer?.player_name ?? "TBD",
-      team: selectedPlayer?.team ?? "TBD",
+      player_id: primaryPlayer?.player_id ?? selectedPlayer?.player_id ?? 0,
+      player_name: primaryPlayer?.player_name ?? selectedPlayer?.player_name ?? "TBD",
+      team: primaryPlayer?.team ?? selectedPlayer?.team ?? "TBD",
       category: cat,
       angle,
       content_type,
       player2_id: player2?.player_id ?? null,
       player2_name: player2?.player_name ?? null,
+      top3_players: top3Players,
     });
   }
 
-  // Reconstruct in original slot order
   const posts: PostSelection[] = [];
   for (let i = 0; i < 3; i++) {
     posts.push(resultMap.get(i)!);
   }
 
-  // ── Per-day dedup safety pass ─────────────────────────────────────────────
+  // Per-day dedup safety pass (skip Top3 — they already own multiple players)
   const dayPlayerIds = new Set<number>();
   const safe = posts.map(post => {
+    if (post.category === "Top3") {
+      return post;
+    }
     if (post.player_id && dayPlayerIds.has(post.player_id)) {
       const fallback = players.find(
         p => !usedPlayerIds.has(p.player_id) && !dayPlayerIds.has(p.player_id),
@@ -386,6 +461,7 @@ Deno.serve(async (req: Request) => {
           player_name: post.player_name ?? null,
           player2_id: post.player2_id ?? null,
           player2_name: post.player2_name ?? null,
+          top3_players: post.top3_players ?? null,
           team: post.team ?? null,
           category: post.category,
           content_type: post.content_type,
@@ -471,7 +547,6 @@ Deno.serve(async (req: Request) => {
         const postCount = posts?.length ?? 0;
         console.log(`[plan-builder] Found existing plan ${existing.id} with ${postCount} posts`);
 
-        // If plan is incomplete (< 21 posts), regenerate
         if (postCount >= 21) {
           return new Response(
             JSON.stringify({ plan_id: existing.id, week_key: weekKey, posts: posts ?? [] }),
@@ -573,7 +648,6 @@ Deno.serve(async (req: Request) => {
       `[plan-builder] ${mappedPlayers.length} players, ${proofPlayers.length} proof players, round ${roundNum}`,
     );
 
-    // ── Plan upsert ──────────────────────────────────────────────────────────
     const { data: existingPlan } = await db
       .from("weekly_content_plans")
       .select("id")
@@ -615,7 +689,6 @@ Deno.serve(async (req: Request) => {
       console.log(`[plan-builder] Created new plan ${planId}`);
     }
 
-    // ── Build 21 posts ───────────────────────────────────────────────────────
     const usedPlayerIds = new Set<number>();
     const postsToInsert: object[] = [];
 
@@ -635,6 +708,7 @@ Deno.serve(async (req: Request) => {
           player_name: post.player_name || null,
           player2_id: post.player2_id,
           player2_name: post.player2_name,
+          top3_players: post.top3_players ?? null,
           team: post.team || null,
           category: post.category,
           content_type: post.content_type,
@@ -645,7 +719,6 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    // ── 21-post guarantee ────────────────────────────────────────────────────
     const expectedTotal = 21;
     if (postsToInsert.length < expectedTotal) {
       const missing = expectedTotal - postsToInsert.length;
@@ -662,6 +735,7 @@ Deno.serve(async (req: Request) => {
           player_name: fillPlayer?.player_name ?? "TBD",
           player2_id: null,
           player2_name: null,
+          top3_players: null,
           team: fillPlayer?.team ?? "TBD",
           category: "Value",
           content_type: "Graphic Post",

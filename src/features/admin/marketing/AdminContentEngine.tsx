@@ -40,6 +40,17 @@ interface WeeklyContentPost {
   error_message: string | null;
   created_at: string;
   updated_at: string;
+  top3_players: Top3Player[] | null;
+}
+
+interface Top3Player {
+  player_id: number;
+  player_name: string;
+  team: string;
+  position: string;
+  projection: number;
+  ceiling: number;
+  value_score: number;
 }
 
 interface PlayerOption {
@@ -781,8 +792,25 @@ function PostDetailPanel({
             {(() => { const Icon = catMeta.icon; return <Icon className="h-3 w-3" />; })()}
             {post.category}
           </span>
-          <span className="text-sm font-semibold">{post.player_name ?? "—"}</span>
-          <span className="text-xs text-muted-foreground">{post.team ?? ""}</span>
+          {post.category === "Top3" && Array.isArray(post.top3_players) && post.top3_players.length >= 3 ? (
+            <div className="flex items-center gap-2 flex-wrap">
+              {post.top3_players.slice(0, 3).map((p, i) => {
+                const rankColors = ["text-amber-500", "text-slate-400", "text-orange-600"];
+                const rankLabels = ["#1", "#2", "#3"];
+                return (
+                  <span key={p.player_id} className="flex items-center gap-1">
+                    <span className={`text-[10px] font-bold ${rankColors[i]}`}>{rankLabels[i]}</span>
+                    <span className="text-sm font-semibold">{p.player_name}</span>
+                  </span>
+                );
+              })}
+            </div>
+          ) : (
+            <>
+              <span className="text-sm font-semibold">{post.player_name ?? "—"}</span>
+              <span className="text-xs text-muted-foreground">{post.team ?? ""}</span>
+            </>
+          )}
           {post.conversion_score != null && (
             <span className="inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded bg-foreground/10 text-foreground">
               {post.conversion_score.toFixed(1)}/10
@@ -1040,8 +1068,26 @@ function PostCard({
           </span>
         )}
       </div>
-      <p className="font-semibold text-sm leading-tight truncate">{post.player_name ?? "—"}</p>
-      <p className="text-xs text-muted-foreground truncate mb-1.5">{post.team ?? ""}</p>
+      {post.category === "Top3" && Array.isArray(post.top3_players) && post.top3_players.length >= 3 ? (
+        <div className="space-y-0.5 mb-1.5">
+          {post.top3_players.slice(0, 3).map((p, i) => {
+            const rankColors = ["text-amber-500", "text-slate-400", "text-orange-600"];
+            const rankLabels = ["#1", "#2", "#3"];
+            return (
+              <div key={p.player_id} className="flex items-center gap-1.5">
+                <span className={`text-[10px] font-bold w-5 shrink-0 ${rankColors[i]}`}>{rankLabels[i]}</span>
+                <span className="text-xs font-semibold truncate">{p.player_name}</span>
+                <span className="text-[10px] text-muted-foreground ml-auto shrink-0">{Math.round(p.projection)}pts</span>
+              </div>
+            );
+          })}
+        </div>
+      ) : (
+        <>
+          <p className="font-semibold text-sm leading-tight truncate">{post.player_name ?? "—"}</p>
+          <p className="text-xs text-muted-foreground truncate mb-1.5">{post.team ?? ""}</p>
+        </>
+      )}
       {hooks[0] && (
         <p className="text-[10px] text-muted-foreground/80 leading-snug line-clamp-2 font-mono">{hooks[0]}</p>
       )}

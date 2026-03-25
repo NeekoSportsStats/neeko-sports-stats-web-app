@@ -7,6 +7,16 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
 };
 
+interface Top3Player {
+  player_id: number;
+  player_name: string;
+  team: string;
+  position: string;
+  projection: number;
+  ceiling: number;
+  value_score: number;
+}
+
 interface PostRow {
   id: string;
   weekly_plan_id: string;
@@ -22,6 +32,7 @@ interface PostRow {
   angle: string | null;
   status: string;
   locked: boolean;
+  top3_players: Top3Player[] | null;
 }
 
 interface PlayerCache {
@@ -97,6 +108,33 @@ function buildEmptyPlatforms(playerName: string, category: string, team: string)
   };
 }
 
+function buildEmptyTop3Platforms(players: Top3Player[]): PlatformVariants {
+  const names = players.map(p => p.player_name).join(", ");
+  return {
+    tiktok: {
+      hook: `Top 3 picks this round — the data doesn't lie.`,
+      caption: `My top 3 AFL Fantasy picks this round: ${names}. Full breakdown at Neeko Sports.`,
+      hashtags: ["#AFLFantasy", "#NeekoSports", "#AFL", "#FantasyTips", "#FantasyFootball"],
+      cta: "Full breakdown — link in bio.",
+    },
+    instagram: {
+      hook: `Top 3 picks this round — ranked by the data.`,
+      caption: `My top 3 AFL Fantasy picks this round:\n#1 ${players[0]?.player_name ?? ""}\n#2 ${players[1]?.player_name ?? ""}\n#3 ${players[2]?.player_name ?? ""}\n\nFull analysis at Neeko Sports — link in bio.`,
+      hashtags: ["#AFLFantasy", "#NeekoSports", "#AFL", "#FantasyFootball", "#AFLFantasyTips"],
+      carousel: [
+        `Top 3 Picks This Round`,
+        `#1 ${players[0]?.player_name ?? ""} — Proj: ${Math.round(players[0]?.projection ?? 0)}pts`,
+        `#2 ${players[1]?.player_name ?? ""} — Proj: ${Math.round(players[1]?.projection ?? 0)}pts`,
+        `#3 ${players[2]?.player_name ?? ""} — Full breakdown at Neeko Sports`,
+      ],
+    },
+    reddit: {
+      title: `[Data] Top 3 AFL Fantasy picks this round — Neeko model rankings`,
+      body: `Neeko model has ranked the top 3 AFL Fantasy picks this round: ${names}. Projections look strong across all three. Anyone else got these in their squad?`,
+    },
+  };
+}
+
 function normalisePlatformVariants(
   raw: Record<string, unknown>,
   playerName: string,
@@ -144,7 +182,6 @@ function normalisePlatformVariants(
   let instagram: PlatformVariants["instagram"];
   if (rawIg && typeof rawIg === "object" && !Array.isArray(rawIg)) {
     const ig = rawIg as Record<string, unknown>;
-    // Normalise carousel_text → carousel array
     let carousel: string[] = [];
     if (Array.isArray(ig.carousel)) {
       carousel = (ig.carousel as unknown[]).map(String).filter(Boolean);
@@ -253,6 +290,25 @@ TOP 3 POST RULES:
 - No more than one player from the same team.
 - Voice: "My top 3 [position/day] picks this round — and the data backs every single one."
 - Visual: Stacked rank cards. Gold/Silver/Bronze. Player name + one key stat per row.
+- The voice_script MUST follow this exact format:
+  "Top 3 Picks This Week 👇
+
+  #1 {player_name}
+  Projection: {X}pts
+  Ceiling: {X}pts
+  Why: {one sentence data-driven reason}
+
+  #2 {player_name}
+  Projection: {X}pts
+  Ceiling: {X}pts
+  Why: {one sentence data-driven reason}
+
+  #3 {player_name}
+  Projection: {X}pts
+  Ceiling: {X}pts
+  Why: {one sentence data-driven reason}
+
+  {Closing CTA line — e.g. 'Full breakdown at Neeko Sports — link in bio.'}"
 
 INJURY ALERT POST RULES:
 - Urgent tone — breaking news style.
@@ -269,7 +325,7 @@ PROOF POST RULES:
 - Voice: "We projected [Player] at [X] pts last round — they scored [Y] pts. That's [gap] pts off. The model works."
 - Visual: Screen recording or graphic showing projected vs actual score side by side.
 
-VOICE SCRIPT RULES:
+VOICE SCRIPT RULES (non-Top3):
 - 55-80 words. Hook → Setup → Data pivot → Strong take → CTA (Neeko Sports link in bio).
 - Use "..." for natural pauses. Use "—" for hard emphasis breaks.
 - Sound like a sharp analyst who has ALREADY made the decision.
@@ -395,7 +451,6 @@ Consistency: ${Math.round(player2.consistency)}%`
     Captain: "This is a CAPTAIN post. This player is the elite captain pick this round. The data is decisive — lock them in.",
     Proof: "This is a PROOF post. Use the player's actual vs projected scores to demonstrate Neeko's model accuracy. Build credibility. Show the model works.",
     H2H: "This is a HEAD-TO-HEAD debate post. Force the audience to choose between the two players. No neutral answer allowed. Every element drives comments.",
-    Top3: "This is a TOP 3 post. Present the top 3 ranked picks for this game day. Make it feel definitive — the audience should save and share this.",
     Injury: "This is an INJURY ALERT post. Create urgency around a replacement opportunity. Give 3 clear alternatives with projections and prices.",
     Conversation: "This is a CONVERSATION post. Ask a sharp question or run a poll. No player stats needed. Drive comment engagement above all else.",
     Engagement: "This is an ENGAGEMENT post. Ask a sharp question, run a poll, or spark a debate. Pick a controversial topic in AFL Fantasy. Drive comments above all else.",
@@ -482,6 +537,132 @@ conversion_score must be a number 1.0 to 10.0
 hook_score must be a number 1.0 to 10.0
 
 Generate the complete post. No blanks, no placeholders, no generic filler. ALL platform_variants fields must be real content.`;
+}
+
+function buildTop3UserPrompt(post: PostRow, players: Top3Player[]): string {
+  const p1 = players[0];
+  const p2 = players[1];
+  const p3 = players[2];
+
+  const formatPlayer = (rank: number, p: Top3Player) =>
+    `#${rank} ${p.player_name} (${p.team}, ${p.position})
+  Projection: ${Math.round(p.projection)}pts
+  Ceiling: ${Math.round(p.ceiling)}pts
+  Value Score: ${Number(p.value_score).toFixed(1)}`;
+
+  return `Generate ONE AFL Fantasy TOP 3 content post for Neeko Sports.
+
+CATEGORY: Top3
+CONTENT TYPE: ${post.content_type}
+DAY: ${post.day_key} (slot ${post.slot_key})
+
+This is a TOP 3 post. Present three ranked AFL Fantasy picks with data justification.
+Make it feel definitive — the audience should save and share this.
+
+TOP 3 PLAYERS (ranked by Neeko model — do NOT change the order):
+${formatPlayer(1, p1)}
+
+${formatPlayer(2, p2)}
+
+${formatPlayer(3, p3)}
+
+---
+
+MANDATORY: The voice_script MUST follow this EXACT format (no exceptions):
+"Top 3 Picks This Week 👇
+
+#1 ${p1.player_name}
+Projection: ${Math.round(p1.projection)}pts
+Ceiling: ${Math.round(p1.ceiling)}pts
+Why: [one sentence — specific data-driven reason]
+
+#2 ${p2.player_name}
+Projection: ${Math.round(p2.projection)}pts
+Ceiling: ${Math.round(p2.ceiling)}pts
+Why: [one sentence — specific data-driven reason]
+
+#3 ${p3.player_name}
+Projection: ${Math.round(p3.projection)}pts
+Ceiling: ${Math.round(p3.ceiling)}pts
+Why: [one sentence — specific data-driven reason]
+
+[Closing CTA line — e.g. 'Full breakdown at Neeko Sports — link in bio.']"
+
+Platform variants must feature all 3 players by name. Carousel slides must cover all 3 ranked picks.
+
+CRITICAL: The platform_variants field MUST be fully populated for all three platforms.
+
+OUTPUT FORMAT (strict JSON, no markdown):
+{
+  "post_type": "${post.content_type}",
+  "category": "Top3",
+  "content_angle": "top3_ranked",
+  "angle_label": "Value Edge",
+  "creative_style": "data_graphic",
+  "player_name": "${p1.player_name}",
+  "player_id": ${p1.player_id},
+  "team": "${p1.team}",
+  "player2_name": null,
+  "player2_id": null,
+  "hooks": [
+    "hook featuring all 3 player names under 20 words",
+    "second hook with a bold take under 20 words",
+    "third hook creating FOMO under 20 words"
+  ],
+  "voice_script": "EXACT FORMAT AS SPECIFIED ABOVE — must include #1 #2 #3 headers with Projection, Ceiling, Why per player",
+  "caption_script": "Multi-line caption naming all 3 players with their projections and CTA",
+  "visual_plan": "Stack layout — dark #0D0D0D background. Row 1: GOLD badge #1 + ${p1.player_name} (${p1.team}) + ${Math.round(p1.projection)}pts projection. Row 2: SILVER badge #2 + ${p2.player_name} (${p2.team}) + ${Math.round(p2.projection)}pts projection. Row 3: BRONZE badge #3 + ${p3.player_name} (${p3.team}) + ${Math.round(p3.projection)}pts projection. Header: 'TOP 3 PICKS THIS ROUND' in bold white. Green #00C853 accent dividers. Neeko Sports logo bottom-right.",
+  "ai_image_prompt": "Style: ESPN Fox Sports graphic design. Subject: Top 3 AFL Fantasy picks this round — three stacked rank cards. Layout: dark #0D0D0D background with gold/silver/bronze rank indicators. Row 1 GOLD: ${p1.player_name} (${p1.team}) ${Math.round(p1.projection)}pts. Row 2 SILVER: ${p2.player_name} (${p2.team}) ${Math.round(p2.projection)}pts. Row 3 BRONZE: ${p3.player_name} (${p3.team}) ${Math.round(p3.projection)}pts. Text overlay: 'TOP 3 THIS ROUND'. Colour palette: #0D0D0D, #FFD700 gold, #C0C0C0 silver, #CD7F32 bronze, #00C853 green accents. Mood: authoritative. Brand: Neeko Sports logo bottom-right white.",
+  "ai_video_prompt": "Scene 1 (0-4s): 'TOP 3 PICKS THIS ROUND' slams into frame on dark background, gold flash, hard zoom in. Scene 2 (4-16s): Ranked cards reveal one by one — #1 gold card slides in with ${p1.player_name} + ${Math.round(p1.projection)}pts, then #2 silver + ${p2.player_name} + ${Math.round(p2.projection)}pts, then #3 bronze + ${p3.player_name} + ${Math.round(p3.projection)}pts, each with count-up animation. Scene 3 (16-22s): All 3 cards visible together — green #00C853 flash, Neeko Sports logo pulses in, 'Full breakdown — link in bio' bold white. Fade to black.",
+  "strategy_json": {
+    "goal": "Drive saves and profile visits via definitive weekly ranked list",
+    "trigger": "FOMO and authority",
+    "expected_behaviour": "save",
+    "best_posting_time": "Friday morning 7am-9am",
+    "cta": "Full breakdown at Neeko Sports — link in bio"
+  },
+  "platform_variants": {
+    "tiktok": {
+      "hook": "Under 10 words naming at least one player or a bold take",
+      "caption": "1-2 lines naming all 3 players with projections",
+      "hashtags": ["#AFLFantasy", "#NeekoSports", "#AFL", "#FantasyTips", "#FantasyFootball"],
+      "cta": "Full breakdown — link in bio."
+    },
+    "instagram": {
+      "hook": "Bold ranking statement under 15 words",
+      "caption": "Multi-line caption with #1 #2 #3 each on own line with projection",
+      "hashtags": ["#AFLFantasy", "#NeekoSports", "#AFL", "#FantasyFootball", "#AFLFantasyTips", "#AFLRound1"],
+      "carousel": [
+        "Slide 1: TOP 3 PICKS THIS ROUND — Save This",
+        "Slide 2: #1 ${p1.player_name} — ${Math.round(p1.projection)}pts projected",
+        "Slide 3: #2 ${p2.player_name} — ${Math.round(p2.projection)}pts projected | #3 ${p3.player_name} — ${Math.round(p3.projection)}pts projected",
+        "Slide 4: Full analysis at Neeko Sports — link in bio"
+      ]
+    },
+    "reddit": {
+      "title": "[Data] My top 3 AFL Fantasy picks this round based on Neeko projections",
+      "body": "3-5 sentences featuring all 3 players by name with their projections. Genuine community tone. End with a question about who others are picking."
+    }
+  },
+  "ctas": [
+    "Full breakdown at Neeko Sports — link in bio.",
+    "Who are you picking? Drop your top 3 below 👇",
+    "Save this before lockout. Full rankings — Neeko Sports."
+  ],
+  "conversion_score": 8.5,
+  "confidence_label": "HIGH",
+  "hook_score": 8.0,
+  "hook_type": "Data-first"
+}
+
+angle_label must be one of: "Contrarian", "Value Edge", "Fear", "Proof", "Debate", "Breakout", "Captain Lock"
+creative_style must be one of: pov_stadium, screen_proof, data_graphic, debate_post, reaction_take, comparison_reveal, countdown_urgency, narrative_arc
+confidence_label must be one of: HIGH, MEDIUM, LOW
+hook_type must be one of: Controversy, Fear, Data-first, Contrarian, Challenge, Identity, Narrative
+conversion_score must be a number 1.0 to 10.0
+hook_score must be a number 1.0 to 10.0
+
+REMINDER: voice_script MUST follow the exact #1/#2/#3 format with Projection, Ceiling, Why per player. No exceptions.`;
 }
 
 async function callOpenAI(
@@ -672,32 +853,161 @@ Deno.serve(async (req: Request) => {
       .update({ status: "generating", error_message: null, updated_at: new Date().toISOString() })
       .eq("id", postId);
 
+    const typedPost = postRow as PostRow;
+    const isTop3 = typedPost.category === "Top3";
+    const top3Players = isTop3 && Array.isArray(typedPost.top3_players) && typedPost.top3_players.length >= 3
+      ? typedPost.top3_players as Top3Player[]
+      : null;
+
+    const playerName = typedPost.player_name ?? "Unknown";
+    const category = typedPost.category ?? "Value";
+    const team = typedPost.team ?? "Unknown";
+
+    const apiKey = Deno.env.get("OPENAI_API_KEY");
+
+    // ── Top3 path ─────────────────────────────────────────────────────────────
+    if (isTop3 && top3Players) {
+      console.log(`[generate-content-post] Top3 path for post ${postId} — ${top3Players.map(p => p.player_name).join(", ")}`);
+
+      if (!apiKey) {
+        const fallbackPlatforms = buildEmptyTop3Platforms(top3Players);
+        const p1 = top3Players[0];
+        const p2 = top3Players[1];
+        const p3 = top3Players[2];
+        const fallback = {
+          hooks: [
+            `Top 3 picks this round — ${p1.player_name}, ${p2.player_name}, ${p3.player_name}.`,
+            `The data has spoken — my top 3 AFL Fantasy picks.`,
+            `${p1.player_name} is my #1 pick this round. Here's why.`,
+          ],
+          voice_script: `Top 3 Picks This Week 👇\n\n#1 ${p1.player_name}\nProjection: ${Math.round(p1.projection)}pts\nCeiling: ${Math.round(p1.ceiling)}pts\nWhy: Top projection in the pool with strong value score.\n\n#2 ${p2.player_name}\nProjection: ${Math.round(p2.projection)}pts\nCeiling: ${Math.round(p2.ceiling)}pts\nWhy: High ceiling upside with favourable matchup.\n\n#3 ${p3.player_name}\nProjection: ${Math.round(p3.projection)}pts\nCeiling: ${Math.round(p3.ceiling)}pts\nWhy: Consistent performer with value backing. Full breakdown at Neeko Sports — link in bio.`,
+          caption_script: `Top 3 AFL Fantasy picks this round:\n#1 ${p1.player_name} — ${Math.round(p1.projection)}pts\n#2 ${p2.player_name} — ${Math.round(p2.projection)}pts\n#3 ${p3.player_name} — ${Math.round(p3.projection)}pts\n\nFull analysis at Neeko Sports — link in bio.\n\n#AFLFantasy #NeekoSports #AFL`,
+          visual_plan: `Stack layout — dark #0D0D0D background. Row 1: GOLD badge #1 + ${p1.player_name} (${p1.team}) + ${Math.round(p1.projection)}pts projection. Row 2: SILVER badge #2 + ${p2.player_name} (${p2.team}) + ${Math.round(p2.projection)}pts projection. Row 3: BRONZE badge #3 + ${p3.player_name} (${p3.team}) + ${Math.round(p3.projection)}pts projection. Header: 'TOP 3 PICKS THIS ROUND'. Neeko Sports logo bottom-right.`,
+          ai_image_prompt: `Style: ESPN Fox Sports graphic. Top 3 AFL Fantasy rank cards stacked on dark #0D0D0D. Row 1 GOLD: ${p1.player_name} ${Math.round(p1.projection)}pts. Row 2 SILVER: ${p2.player_name} ${Math.round(p2.projection)}pts. Row 3 BRONZE: ${p3.player_name} ${Math.round(p3.projection)}pts. Text overlay: 'TOP 3 THIS ROUND'. Neeko Sports logo bottom-right.`,
+          ai_video_prompt: `Scene 1 (0-4s): 'TOP 3 PICKS' slams in gold flash. Scene 2 (4-16s): Cards reveal — #1 ${p1.player_name}, #2 ${p2.player_name}, #3 ${p3.player_name} count-up. Scene 3 (16-22s): All 3 cards green flash, Neeko logo, 'link in bio'.`,
+          creative_style: "data_graphic",
+          angle_label: "Value Edge",
+          confidence_label: "HIGH",
+          hook_score: 7.5,
+          hook_type: "Data-first",
+          conversion_score: 8.0,
+          strategy_json: {
+            goal: "Drive saves and profile visits",
+            trigger: "Authority and FOMO",
+            expected_behaviour: "save",
+            best_posting_time: "Friday 7am-9am",
+            cta: "Full breakdown at Neeko Sports — link in bio",
+          },
+          platform_variants: fallbackPlatforms,
+          ctas: [
+            "Full breakdown at Neeko Sports — link in bio.",
+            "Who are you picking? Drop below 👇",
+            "Save this before lockout.",
+          ],
+        };
+
+        await db
+          .from("weekly_content_posts")
+          .update({ ...fallback, status: "ready", updated_at: new Date().toISOString() })
+          .eq("id", postId);
+
+        const { data: updatedPost } = await db
+          .from("weekly_content_posts")
+          .select("*")
+          .eq("id", postId)
+          .maybeSingle();
+
+        console.log(`[generate-content-post] Top3 fallback (no API key) generated for post ${postId}`);
+        return new Response(
+          JSON.stringify({ post: updatedPost }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+
+      const systemPrompt = buildSystemPrompt();
+      const userPrompt = buildTop3UserPrompt(typedPost, top3Players);
+
+      let rawResult: Record<string, unknown>;
+      let normalised: Record<string, unknown>;
+
+      try {
+        rawResult = await callOpenAI(systemPrompt, userPrompt);
+        normalised = normaliseGeneratedPost(rawResult, top3Players[0].player_name, "Top3", top3Players[0].team);
+
+        const platforms = normalised.platform_variants as PlatformVariants;
+        if (isPlatformEmpty(platforms)) {
+          console.warn(`[generate-content-post] Top3 platform fields empty for ${postId}, retrying...`);
+          try {
+            const retryResult = await callOpenAI(systemPrompt, userPrompt);
+            const retryNormalised = normaliseGeneratedPost(retryResult, top3Players[0].player_name, "Top3", top3Players[0].team);
+            const retryPlatforms = retryNormalised.platform_variants as PlatformVariants;
+            if (!isPlatformEmpty(retryPlatforms)) {
+              normalised = retryNormalised;
+            } else {
+              normalised = { ...retryNormalised, platform_variants: buildEmptyTop3Platforms(top3Players) };
+            }
+          } catch (_retryErr) {
+            normalised = { ...normalised, platform_variants: buildEmptyTop3Platforms(top3Players) };
+          }
+        }
+      } catch (genErr) {
+        const errMsg = genErr instanceof Error ? genErr.message : String(genErr);
+        console.error(`[generate-content-post] Top3 generation failed for ${postId}:`, errMsg);
+        await db
+          .from("weekly_content_posts")
+          .update({ status: "error", error_message: errMsg.slice(0, 500), updated_at: new Date().toISOString() })
+          .eq("id", postId);
+        return new Response(
+          JSON.stringify({ error: "Top3 generation failed", post_id: postId }),
+          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+
+      await db
+        .from("weekly_content_posts")
+        .update({ ...normalised, status: "ready", updated_at: new Date().toISOString() })
+        .eq("id", postId);
+
+      const { data: updatedPost } = await db
+        .from("weekly_content_posts")
+        .select("*")
+        .eq("id", postId)
+        .maybeSingle();
+
+      console.log(`[generate-content-post] Top3 success for post ${postId}`);
+      return new Response(
+        JSON.stringify({ post: updatedPost }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
+    // ── Standard single-player path ───────────────────────────────────────────
     let playerData: PlayerCache | null = null;
-    if (postRow.player_id) {
+    if (typedPost.player_id) {
       const { data: pd } = await aflDb
         .from("player_rankings_cache")
         .select("*")
-        .eq("player_id", postRow.player_id)
+        .eq("player_id", typedPost.player_id)
         .maybeSingle();
       playerData = pd ?? null;
     }
 
     let player2Data: PlayerCache | null = null;
-    if (postRow.player2_id) {
+    if (typedPost.player2_id) {
       const { data: pd2 } = await aflDb
         .from("player_rankings_cache")
         .select("*")
-        .eq("player_id", postRow.player2_id)
+        .eq("player_id", typedPost.player2_id)
         .maybeSingle();
       player2Data = pd2 ?? null;
     }
 
     let aiSummary: string | null = null;
-    if (postRow.player_id) {
+    if (typedPost.player_id) {
       const { data: aiRow } = await aiDb
         .from("player_ai_analysis")
         .select("summary_long, summary_short, recommendation")
-        .eq("player_id", postRow.player_id)
+        .eq("player_id", typedPost.player_id)
         .order("created_at", { ascending: false })
         .limit(1)
         .maybeSingle();
@@ -707,12 +1017,6 @@ Deno.serve(async (req: Request) => {
           .join("\n");
       }
     }
-
-    const playerName = postRow.player_name ?? "Unknown";
-    const category = postRow.category ?? "Value";
-    const team = postRow.team ?? "Unknown";
-
-    const apiKey = Deno.env.get("OPENAI_API_KEY");
 
     // ── No API key — use structured fallback ─────────────────────────────────
     if (!apiKey) {
@@ -769,7 +1073,7 @@ Deno.serve(async (req: Request) => {
 
     // ── OpenAI generation with retry ─────────────────────────────────────────
     const systemPrompt = buildSystemPrompt();
-    const userPrompt = buildUserPrompt(postRow as PostRow, playerData, player2Data, aiSummary);
+    const userPrompt = buildUserPrompt(typedPost, playerData, player2Data, aiSummary);
 
     let rawResult: Record<string, unknown>;
     let normalised: Record<string, unknown>;
@@ -791,7 +1095,6 @@ Deno.serve(async (req: Request) => {
             normalised = retryNormalised;
             console.log(`[generate-content-post] Retry succeeded for ${postId}`);
           } else {
-            // Merge: keep retry text fields but force filled platforms
             const filled = buildEmptyPlatforms(playerName, category, team);
             const merged: PlatformVariants = {
               tiktok: {
@@ -816,7 +1119,6 @@ Deno.serve(async (req: Request) => {
           }
         } catch (retryErr) {
           console.error(`[generate-content-post] Retry failed for ${postId}:`, retryErr);
-          // Keep first result but force fill platform gaps
           const filled = buildEmptyPlatforms(playerName, category, team);
           normalised = { ...normalised, platform_variants: filled };
         }
@@ -825,14 +1127,12 @@ Deno.serve(async (req: Request) => {
       const errMsg = genErr instanceof Error ? genErr.message : String(genErr);
       console.error(`[generate-content-post] Generation failed for ${postId}:`, errMsg);
 
-      // ── Generation failure: try with different player approach ───────────
       try {
         console.log(`[generate-content-post] Attempting recovery generation for ${postId}...`);
         const recoveryResult = await callOpenAI(systemPrompt, userPrompt);
         normalised = normaliseGeneratedPost(recoveryResult, playerName, category, team);
         console.log(`[generate-content-post] Recovery succeeded for ${postId}`);
       } catch (_recoveryErr) {
-        // Both attempts failed — write error status and return
         await db
           .from("weekly_content_posts")
           .update({
