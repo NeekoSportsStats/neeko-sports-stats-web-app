@@ -222,14 +222,10 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    console.log("[generate-weekly-content] BUILD MARKER 2026-03-25-C");
+    console.log("[generate-weekly-content] BUILD MARKER 2026-03-25-CONTENT-FIX");
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL");
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-
-    console.log("[generate-weekly-content] FUNCTION HIT");
-    console.log("[generate-weekly-content] URL EXISTS:", !!supabaseUrl);
-    console.log("[generate-weekly-content] SERVICE ROLE EXISTS:", !!serviceKey);
 
     if (!supabaseUrl || !serviceKey) {
       return new Response(
@@ -247,17 +243,6 @@ Deno.serve(async (req: Request) => {
         schema: "public",
       },
     });
-
-    console.log("[generate-weekly-content] SELF-TEST: inserting debug row into weekly_content_plans");
-    const { data: selfTestData, error: selfTestError } = await db
-      .from("weekly_content_plans")
-      .insert({ week_key: "SELF-TEST-DEBUG", week_start_date: "2026-01-01", plan_json: {}, status: "debug", generated_at: new Date().toISOString() })
-      .select("id")
-      .single();
-    console.log("[generate-weekly-content] SELF-TEST RESULT:", selfTestError ? `ERROR: ${selfTestError.message} (code: ${selfTestError.code})` : `OK id=${selfTestData?.id}`);
-    if (selfTestData?.id) {
-      await db.from("weekly_content_plans").delete().eq("week_key", "SELF-TEST-DEBUG");
-    }
 
     const body = await req.json().catch(() => ({}));
     const action = body?.action as string | undefined;
