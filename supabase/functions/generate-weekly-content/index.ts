@@ -242,6 +242,107 @@ Deno.serve(async (req: Request) => {
     });
 
     const body = await req.json().catch(() => ({}));
+    const action = body?.action as string | undefined;
+
+    if (action === "get_players") {
+      const aflDb = createClient(supabaseUrl, serviceKey, {
+        auth: { persistSession: false, autoRefreshToken: false },
+        global: { headers: { Authorization: `Bearer ${serviceKey}` } },
+        db: { schema: "afl" },
+      });
+      const { data, error } = await aflDb
+        .from("player_rankings_cache")
+        .select("player_id, player_name, team, position, projection_final, neeko_rating_scaled")
+        .eq("is_available", true)
+        .not("projection_final", "is", null)
+        .order("projection_final", { ascending: false, nullsFirst: false })
+        .limit(80);
+      if (error) throw new Error(error.message);
+      return new Response(JSON.stringify({ players: data ?? [] }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    if (action === "toggle_lock") {
+      const { post_id, locked } = body as { post_id: string; locked: boolean };
+      const { error } = await db.from("weekly_content_posts").update({ locked }).eq("id", post_id);
+      if (error) throw new Error(error.message);
+      return new Response(JSON.stringify({ ok: true }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    if (action === "duplicate_post") {
+      const { post } = body as { post: Record<string, unknown> };
+      const { data, error } = await db
+        .from("weekly_content_posts")
+        .insert({
+          weekly_plan_id: post.weekly_plan_id,
+          day_key: post.day_key,
+          slot_key: `${post.slot_key}-dup-${Date.now()}`,
+          player_id: post.player_id ?? null,
+          player_name: post.player_name ?? null,
+          player2_id: post.player2_id ?? null,
+          player2_name: post.player2_name ?? null,
+          team: post.team ?? null,
+          category: post.category,
+          content_type: post.content_type,
+          angle: post.angle ?? null,
+          status: post.status,
+          locked: false,
+          hooks: post.hooks ?? null,
+          voice_script: post.voice_script ?? null,
+          caption_script: post.caption_script ?? null,
+          visual_plan: post.visual_plan ?? null,
+          ai_image_prompt: post.ai_image_prompt ?? null,
+          ai_video_prompt: post.ai_video_prompt ?? null,
+          creative_style: post.creative_style ?? null,
+          conversion_score: post.conversion_score ?? null,
+          confidence_label: post.confidence_label ?? null,
+          hook_score: post.hook_score ?? null,
+          hook_type: post.hook_type ?? null,
+          strategy_json: post.strategy_json ?? null,
+          platform_variants: post.platform_variants ?? null,
+        })
+        .select()
+        .single();
+      if (error) throw new Error(error.message);
+      return new Response(JSON.stringify({ post: data }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    if (action === "swap_player") {
+      const { post_id, player_id, player_name, team } = body as {
+        post_id: string;
+        player_id: number;
+        player_name: string;
+        team: string;
+      };
+      const { error } = await db
+        .from("weekly_content_posts")
+        .update({
+          player_id,
+          player_name,
+          team,
+          status: "pending",
+          hooks: null,
+          voice_script: null,
+          caption_script: null,
+          visual_plan: null,
+          ai_image_prompt: null,
+          ai_video_prompt: null,
+          strategy_json: null,
+          platform_variants: null,
+          error_message: null,
+        })
+        .eq("id", post_id);
+      if (error) throw new Error(error.message);
+      return new Response(JSON.stringify({ ok: true }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     const forceRegenerate = body?.force === true;
     const focusPlayerId = body?.focus_player_id ?? null;
 

@@ -1112,16 +1112,9 @@ export default function AdminContentEngine() {
   const { toast } = useToast();
 
   useEffect(() => {
-    supabase
-      .schema("afl" as never)
-      .from("player_rankings_cache")
-      .select("player_id, player_name, team, position, projection_final, neeko_rating_scaled")
-      .eq("is_available", true)
-      .not("projection_final", "is", null)
-      .order("projection_final", { ascending: false, nullsFirst: false })
-      .limit(80)
+    supabase.functions.invoke("generate-weekly-content", { body: { action: "get_players" } })
       .then(({ data }) => {
-        if (data) setAvailablePlayers(data as PlayerOption[]);
+        if (data?.players) setAvailablePlayers(data.players as PlayerOption[]);
       });
   }, []);
 
@@ -1206,51 +1199,21 @@ export default function AdminContentEngine() {
     const newLocked = !post.locked;
     updatePost({ ...post, locked: newLocked });
 
-    await supabase
-      .from("weekly_content_posts")
-      .update({ locked: newLocked })
-      .eq("id", post.id);
+    await supabase.functions.invoke("generate-weekly-content", {
+      body: { action: "toggle_lock", post_id: post.id, locked: newLocked },
+    });
 
     toast({ title: newLocked ? `Locked — ${post.player_name}` : `Unlocked — ${post.player_name}` });
   }, [updatePost, toast]);
 
   const handleDuplicate = useCallback(async (post: WeeklyContentPost) => {
     if (!planId) return;
-    const { data, error } = await supabase
-      .from("weekly_content_posts")
-      .insert({
-        weekly_plan_id: planId,
-        day_key: post.day_key,
-        slot_key: `${post.slot_key}-dup-${Date.now()}`,
-        player_id: post.player_id,
-        player_name: post.player_name,
-        player2_id: post.player2_id,
-        player2_name: post.player2_name,
-        team: post.team,
-        category: post.category,
-        content_type: post.content_type,
-        angle: post.angle,
-        status: post.status,
-        locked: false,
-        hooks: post.hooks,
-        voice_script: post.voice_script,
-        caption_script: post.caption_script,
-        visual_plan: post.visual_plan,
-        ai_image_prompt: post.ai_image_prompt,
-        ai_video_prompt: post.ai_video_prompt,
-        creative_style: post.creative_style,
-        conversion_score: post.conversion_score,
-        confidence_label: post.confidence_label,
-        hook_score: post.hook_score,
-        hook_type: post.hook_type,
-        strategy_json: post.strategy_json,
-        platform_variants: post.platform_variants,
-      })
-      .select()
-      .single();
+    const { data } = await supabase.functions.invoke("generate-weekly-content", {
+      body: { action: "duplicate_post", post },
+    });
 
-    if (!error && data) {
-      setPosts(prev => [...prev, data as WeeklyContentPost]);
+    if (data?.post) {
+      setPosts(prev => [...prev, data.post as WeeklyContentPost]);
       toast({ title: `Duplicated — ${post.player_name}`, description: "New post added to the same day." });
     }
   }, [planId, toast]);
@@ -1265,26 +1228,17 @@ export default function AdminContentEngine() {
 
     setSwappingPostId(post.id);
 
-    const { error } = await supabase
-      .from("weekly_content_posts")
-      .update({
+    const { data: swapResult, error: fnError } = await supabase.functions.invoke("generate-weekly-content", {
+      body: {
+        action: "swap_player",
+        post_id: post.id,
         player_id: newPlayer.player_id,
         player_name: newPlayer.player_name,
         team: newPlayer.team,
-        status: "pending",
-        hooks: null,
-        voice_script: null,
-        caption_script: null,
-        visual_plan: null,
-        ai_image_prompt: null,
-        ai_video_prompt: null,
-        strategy_json: null,
-        platform_variants: null,
-        error_message: null,
-      })
-      .eq("id", post.id);
+      },
+    });
 
-    if (!error) {
+    if (!fnError && swapResult?.ok) {
       const updated: WeeklyContentPost = {
         ...post,
         player_id: newPlayer.player_id,
@@ -1306,7 +1260,7 @@ export default function AdminContentEngine() {
       await generatePost(updated);
     } else {
       setSwappingPostId(null);
-      toast({ title: "Swap failed", description: error.message, variant: "destructive" });
+      toast({ title: "Swap failed", description: fnError?.message ?? "Unknown error", variant: "destructive" });
     }
   }, [availablePlayers, updatePost, generatePost, toast]);
 
