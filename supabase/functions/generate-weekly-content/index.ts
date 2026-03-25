@@ -222,8 +222,6 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    console.log("[generate-weekly-content] BUILD MARKER 2026-03-25-CONTENT-FIX-V2");
-
     const supabaseUrl = Deno.env.get("SUPABASE_URL");
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 
@@ -413,8 +411,6 @@ Deno.serve(async (req: Request) => {
       throw new Error(`Player fetch failed: ${playersError.message}`);
     }
 
-    console.log(`[DB INSERT TEST] player_rankings_cache: fetched ${rawPlayers?.length ?? 0} rows`);
-
     const mappedPlayers: PlayerData[] = (rawPlayers ?? []).map((p) => ({
       player_id: p.player_id,
       player_name: p.player_name ?? "Unknown",
@@ -506,7 +502,6 @@ Deno.serve(async (req: Request) => {
 
       console.log(`[plan-builder] Updated existing plan ${planId}, cleared non-locked posts`);
     } else {
-      console.log(`[DB INSERT TEST] weekly_content_plans`);
       const { data: newPlan, error: planInsertError } = await db
         .from("weekly_content_plans")
         .insert({
@@ -557,7 +552,6 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    console.log(`[DB INSERT TEST] weekly_content_posts — inserting ${postsToInsert.length} rows`);
     const { error: insertError } = await db
       .from("weekly_content_posts")
       .insert(postsToInsert);
