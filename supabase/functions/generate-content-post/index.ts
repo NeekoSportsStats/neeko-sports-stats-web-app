@@ -419,7 +419,26 @@ Deno.serve(async (req: Request) => {
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const db = createClient(supabaseUrl, serviceKey);
+
+    console.log("[generate-content-post] AUTH CHECK", serviceKey?.slice(0, 20));
+
+    const db = createClient(supabaseUrl, serviceKey, {
+      auth: { persistSession: false, autoRefreshToken: false },
+      global: { headers: { Authorization: `Bearer ${serviceKey}` } },
+      db: { schema: "public" },
+    });
+
+    const aflDb = createClient(supabaseUrl, serviceKey, {
+      auth: { persistSession: false, autoRefreshToken: false },
+      global: { headers: { Authorization: `Bearer ${serviceKey}` } },
+      db: { schema: "afl" },
+    });
+
+    const aiDb = createClient(supabaseUrl, serviceKey, {
+      auth: { persistSession: false, autoRefreshToken: false },
+      global: { headers: { Authorization: `Bearer ${serviceKey}` } },
+      db: { schema: "ai" },
+    });
 
     const body = await req.json().catch(() => ({}));
     const postId = body?.post_id;
@@ -434,7 +453,6 @@ Deno.serve(async (req: Request) => {
     console.log(`[generate-content-post] Generating post ${postId}`);
 
     const { data: postRow, error: postError } = await db
-      .schema("marketing")
       .from("weekly_content_posts")
       .select("*")
       .eq("id", postId)
@@ -454,14 +472,14 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    await db.schema("marketing")
+    await db
       .from("weekly_content_posts")
       .update({ status: "generating", error_message: null, updated_at: new Date().toISOString() })
       .eq("id", postId);
 
     let playerData: PlayerCache | null = null;
     if (postRow.player_id) {
-      const { data: pd } = await db
+      const { data: pd } = await aflDb
         .from("player_rankings_cache")
         .select("*")
         .eq("player_id", postRow.player_id)
@@ -471,7 +489,7 @@ Deno.serve(async (req: Request) => {
 
     let player2Data: PlayerCache | null = null;
     if (postRow.player2_id) {
-      const { data: pd2 } = await db
+      const { data: pd2 } = await aflDb
         .from("player_rankings_cache")
         .select("*")
         .eq("player_id", postRow.player2_id)
@@ -481,8 +499,7 @@ Deno.serve(async (req: Request) => {
 
     let aiSummary: string | null = null;
     if (postRow.player_id) {
-      const { data: aiRow } = await db
-        .schema("ai")
+      const { data: aiRow } = await aiDb
         .from("player_ai_analysis")
         .select("summary_long, summary_short, recommendation")
         .eq("player_id", postRow.player_id)
@@ -534,7 +551,7 @@ Deno.serve(async (req: Request) => {
         ],
       };
 
-      await db.schema("marketing")
+      await db
         .from("weekly_content_posts")
         .update({
           ...fallback,
@@ -544,7 +561,6 @@ Deno.serve(async (req: Request) => {
         .eq("id", postId);
 
       const { data: updatedPost } = await db
-        .schema("marketing")
         .from("weekly_content_posts")
         .select("*")
         .eq("id", postId)
@@ -563,7 +579,7 @@ Deno.serve(async (req: Request) => {
       const rawResult = await callOpenAI(systemPrompt, userPrompt);
       const normalised = normaliseGeneratedPost(rawResult);
 
-      await db.schema("marketing")
+      await db
         .from("weekly_content_posts")
         .update({
           ...normalised,
@@ -573,7 +589,6 @@ Deno.serve(async (req: Request) => {
         .eq("id", postId);
 
       const { data: updatedPost } = await db
-        .schema("marketing")
         .from("weekly_content_posts")
         .select("*")
         .eq("id", postId)
@@ -588,7 +603,7 @@ Deno.serve(async (req: Request) => {
       const errMsg = genErr instanceof Error ? genErr.message : String(genErr);
       console.error(`[generate-content-post] Generation failed for ${postId}:`, errMsg);
 
-      await db.schema("marketing")
+      await db
         .from("weekly_content_posts")
         .update({
           status: "error",

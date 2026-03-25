@@ -223,7 +223,23 @@ Deno.serve(async (req: Request) => {
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const db = createClient(supabaseUrl, serviceKey);
+
+    console.log("[AUTH CHECK]", serviceKey?.slice(0, 20));
+
+    const db = createClient(supabaseUrl, serviceKey, {
+      auth: {
+        persistSession: false,
+        autoRefreshToken: false,
+      },
+      global: {
+        headers: {
+          Authorization: `Bearer ${serviceKey}`,
+        },
+      },
+      db: {
+        schema: "public",
+      },
+    });
 
     const body = await req.json().catch(() => ({}));
     const forceRegenerate = body?.force === true;
@@ -235,16 +251,18 @@ Deno.serve(async (req: Request) => {
     console.log(`[plan-builder] Starting for week ${weekKey}, force=${forceRegenerate}`);
 
     if (!forceRegenerate) {
-      const { data: existing } = await db
-        .schema("marketing")
+      const { data: existing, error: existingErr } = await db
         .from("weekly_content_plans")
         .select("id, week_key")
         .eq("week_key", weekKey)
         .maybeSingle();
 
+      if (existingErr) {
+        console.error("[plan-builder] Check existing error:", existingErr.message);
+      }
+
       if (existing?.id) {
         const { data: posts } = await db
-          .schema("marketing")
           .from("weekly_content_posts")
           .select("*")
           .eq("weekly_plan_id", existing.id)
@@ -258,9 +276,25 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    console.log("[plan-builder] Fetching player data...");
+    console.log("[plan-builder] Fetching player data from afl.player_rankings_cache...");
 
-    const { data: rawPlayers, error: playersError } = await db
+    // player_rankings_cache is in the afl schema — create a separate client for it
+    const aflDb = createClient(supabaseUrl, serviceKey, {
+      auth: {
+        persistSession: false,
+        autoRefreshToken: false,
+      },
+      global: {
+        headers: {
+          Authorization: `Bearer ${serviceKey}`,
+        },
+      },
+      db: {
+        schema: "afl",
+      },
+    });
+
+    const { data: rawPlayers, error: playersError } = await aflDb
       .from("player_rankings_cache")
       .select(`
         player_id, player_name, team, position,
@@ -277,6 +311,8 @@ Deno.serve(async (req: Request) => {
     if (playersError) {
       console.error("[plan-builder] Player fetch error:", playersError.message);
     }
+
+    console.log(`[DB INSERT TEST] player_rankings_cache: fetched ${rawPlayers?.length ?? 0} rows`);
 
     const mappedPlayers: PlayerData[] = (rawPlayers ?? []).map((p) => ({
       player_id: p.player_id,
@@ -310,7 +346,7 @@ Deno.serve(async (req: Request) => {
 
     let proofPlayers: ProofPlayer[] = [];
     if (roundNum > 0) {
-      const { data: proofRaw } = await db
+      const { data: proofRaw } = await aflDb
         .from("player_games")
         .select("player_id, player_name, team, fantasy_score, projection_final")
         .eq("round", roundNum)
@@ -337,23 +373,26 @@ Deno.serve(async (req: Request) => {
 
     console.log(`[plan-builder] ${mappedPlayers.length} players, ${proofPlayers.length} proof players`);
 
-    const { data: existingPlan } = await db
-      .schema("marketing")
+    const { data: existingPlan, error: existingPlanErr } = await db
       .from("weekly_content_plans")
       .select("id")
       .eq("week_key", weekKey)
       .maybeSingle();
 
+    if (existingPlanErr) {
+      console.error("[plan-builder] Existing plan check error:", existingPlanErr.message);
+    }
+
     let planId: string;
 
     if (existingPlan?.id) {
       planId = existingPlan.id;
-      await db.schema("marketing")
+      await db
         .from("weekly_content_plans")
         .update({ updated_at: new Date().toISOString(), focus_player_id: focusPlayerId })
         .eq("id", planId);
 
-      await db.schema("marketing")
+      await db
         .from("weekly_content_posts")
         .delete()
         .eq("weekly_plan_id", planId)
@@ -361,8 +400,8 @@ Deno.serve(async (req: Request) => {
 
       console.log(`[plan-builder] Updated existing plan ${planId}, cleared non-locked posts`);
     } else {
+      console.log(`[DB INSERT TEST] weekly_content_plans`);
       const { data: newPlan, error: planInsertError } = await db
-        .schema("marketing")
         .from("weekly_content_plans")
         .insert({
           week_key: weekKey,
@@ -376,6 +415,7 @@ Deno.serve(async (req: Request) => {
         .single();
 
       if (planInsertError || !newPlan?.id) {
+        console.error("[plan-builder] Plan insert error:", planInsertError?.message);
         throw new Error(`Failed to create plan: ${planInsertError?.message}`);
       }
       planId = newPlan.id;
@@ -409,8 +449,8 @@ Deno.serve(async (req: Request) => {
       }
     }
 
+    console.log(`[DB INSERT TEST] weekly_content_posts — inserting ${postsToInsert.length} rows`);
     const { error: insertError } = await db
-      .schema("marketing")
       .from("weekly_content_posts")
       .insert(postsToInsert);
 
@@ -419,13 +459,12 @@ Deno.serve(async (req: Request) => {
       throw new Error(`Failed to insert posts: ${insertError.message}`);
     }
 
-    await db.schema("marketing")
+    await db
       .from("weekly_content_plans")
       .update({ status: "ready", updated_at: new Date().toISOString() })
       .eq("id", planId);
 
     const { data: allPosts } = await db
-      .schema("marketing")
       .from("weekly_content_posts")
       .select("*")
       .eq("weekly_plan_id", planId)

@@ -1207,7 +1207,6 @@ export default function AdminContentEngine() {
     updatePost({ ...post, locked: newLocked });
 
     await supabase
-      .schema("marketing" as never)
       .from("weekly_content_posts")
       .update({ locked: newLocked })
       .eq("id", post.id);
@@ -1218,7 +1217,6 @@ export default function AdminContentEngine() {
   const handleDuplicate = useCallback(async (post: WeeklyContentPost) => {
     if (!planId) return;
     const { data, error } = await supabase
-      .schema("marketing" as never)
       .from("weekly_content_posts")
       .insert({
         weekly_plan_id: planId,
@@ -1268,7 +1266,6 @@ export default function AdminContentEngine() {
     setSwappingPostId(post.id);
 
     const { error } = await supabase
-      .schema("marketing" as never)
       .from("weekly_content_posts")
       .update({
         player_id: newPlayer.player_id,
