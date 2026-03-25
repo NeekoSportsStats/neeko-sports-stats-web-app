@@ -249,6 +249,14 @@ Deno.serve(async (req: Request) => {
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const openaiKey      = Deno.env.get("OPENAI_API_KEY");
 
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader || authHeader !== `Bearer ${serviceRoleKey}`) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     let body: Record<string, unknown> = {};
     try { body = await req.json(); } catch { /* no body */ }
 

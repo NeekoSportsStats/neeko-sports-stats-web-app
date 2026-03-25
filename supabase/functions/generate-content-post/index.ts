@@ -612,15 +612,14 @@ Deno.serve(async (req: Request) => {
         .eq("id", postId);
 
       return new Response(
-        JSON.stringify({ error: errMsg, post_id: postId }),
+        JSON.stringify({ error: "Request failed", post_id: postId }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
   } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    console.error("[generate-content-post] Fatal error:", msg);
+    console.error("[generate-content-post] Fatal error:", err);
     return new Response(
-      JSON.stringify({ error: msg }),
+      JSON.stringify({ error: "Request failed" }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   }

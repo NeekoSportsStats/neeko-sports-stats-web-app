@@ -112,7 +112,7 @@ Deno.serve(async (req: Request) => {
       });
       if (error) {
         console.error("commit_price_ingest error:", error);
-        return new Response(JSON.stringify({ error: error.message }), {
+        return new Response(JSON.stringify({ error: "Request failed" }), {
           status: 500,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
@@ -140,7 +140,7 @@ Deno.serve(async (req: Request) => {
   } catch (err) {
     console.error("ADMIN COMMAND ERROR:", err);
     return new Response(
-      JSON.stringify({ error: err.message }),
+      JSON.stringify({ error: "Request failed" }),
       {
         status: 500,
         headers: {

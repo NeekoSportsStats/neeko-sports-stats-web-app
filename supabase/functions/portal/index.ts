@@ -75,7 +75,10 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const returnUrl = `${req.headers.get('origin') || 'https://www.neekostats.com.au'}/account`;
+    const ALLOWED_RETURN_ORIGINS = new Set(['https://www.neekostats.com.au', 'https://neekostats.com.au', 'http://localhost:5173', 'http://localhost:3000']);
+    const requestOrigin = req.headers.get('origin') ?? '';
+    const safeOrigin = ALLOWED_RETURN_ORIGINS.has(requestOrigin) ? requestOrigin : 'https://www.neekostats.com.au';
+    const returnUrl = `${safeOrigin}/account`;
 
     const session = await stripe.billingPortal.sessions.create({
       customer: customerId,
@@ -85,6 +88,6 @@ Deno.serve(async (req: Request) => {
     return Response.json({ url: session.url }, { headers: corsHeaders });
   } catch (err: any) {
     console.error('Portal error:', err);
-    return Response.json({ error: err.message }, { status: 500, headers: corsHeaders });
+    return Response.json({ error: "Request failed" }, { status: 500, headers: corsHeaders });
   }
 });

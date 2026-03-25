@@ -164,9 +164,9 @@ Deno.serve(async (req: Request) => {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
+    console.error("[admin-health] error:", err);
     return new Response(
-      JSON.stringify({ error: message, generated_at: new Date().toISOString() }),
+      JSON.stringify({ error: "Request failed", generated_at: new Date().toISOString() }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   }
