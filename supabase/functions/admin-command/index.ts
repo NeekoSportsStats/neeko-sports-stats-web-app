@@ -116,7 +116,11 @@ Deno.serve(async (req: Request) => {
         return err("Missing required fields: season, round, rows");
       }
       console.log(`[commit_price_ingest] season=${season} round=${round} rows=${rows.length}`);
-      const { data, error } = await supabase.rpc("commit_price_round", {
+      const aflClient = createClient(supabaseUrl, supabaseServiceKey, {
+        auth: { persistSession: false, autoRefreshToken: false },
+        db: { schema: "afl" },
+      });
+      const { data, error } = await aflClient.rpc("commit_price_round", {
         p_season: season,
         p_round: round,
         p_rows: rows,
