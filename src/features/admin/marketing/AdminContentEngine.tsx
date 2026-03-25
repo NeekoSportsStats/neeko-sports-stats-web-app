@@ -6,7 +6,7 @@ import { useToast } from "@/hooks/use-toast";
 // ── TYPES ─────────────────────────────────────────────────────────────────────
 
 type PostStatus = "pending" | "generating" | "ready" | "error";
-type PostCategory = "Value" | "Breakout" | "Trap" | "Captain" | "Proof" | "H2H" | "Top3" | "Injury" | "Conversation";
+type PostCategory = "Value" | "Breakout" | "Trap" | "Captain" | "Proof" | "H2H" | "Top3" | "Injury" | "Conversation" | "Engagement";
 type PostTab = "voice" | "hooks" | "visual" | "caption" | "ai" | "platform" | "strategy" | "prompt";
 
 interface WeeklyContentPost {
@@ -95,6 +95,7 @@ const CATEGORY_META: Record<string, { color: string; bg: string; border: string;
   Top3:         { color: "text-amber-700 dark:text-amber-300",    bg: "bg-amber-500/10",    border: "border-amber-500/30",    icon: Trophy },
   Injury:       { color: "text-pink-700 dark:text-pink-300",      bg: "bg-pink-500/10",     border: "border-pink-500/30",     icon: Ambulance },
   Conversation: { color: "text-teal-700 dark:text-teal-300",      bg: "bg-teal-500/10",     border: "border-teal-500/30",     icon: MessageCircle },
+  Engagement:   { color: "text-sky-700 dark:text-sky-300",         bg: "bg-sky-500/10",      border: "border-sky-500/30",      icon: Users },
 };
 
 const POST_TYPE_ICON: Record<string, React.ElementType> = {
@@ -288,7 +289,7 @@ function AISummaryTabContent({ playerId }: { playerId: number | null }) {
 // ── PLATFORM VARIANTS TAB ─────────────────────────────────────────────────────
 
 type TikTokVariant = { hook?: string; caption?: string; hashtags?: string[]; cta?: string };
-type InstagramVariant = { hook?: string; caption?: string; hashtags?: string[]; carousel_text?: string };
+type InstagramVariant = { hook?: string; caption?: string; hashtags?: string[]; carousel?: string[] };
 type RedditVariant = { title?: string; body?: string };
 type AnyVariant = TikTokVariant | InstagramVariant | RedditVariant | string;
 
@@ -300,7 +301,7 @@ function extractCopyText(key: string, v: AnyVariant): string {
   }
   if (key === "instagram") {
     const ig = v as InstagramVariant;
-    return [ig.hook, ig.caption, ig.carousel_text, ...(ig.hashtags ?? [])].filter(Boolean).join("\n\n");
+    return [ig.hook, ig.caption, ...(ig.carousel ?? []), ...(ig.hashtags ?? [])].filter(Boolean).join("\n\n");
   }
   const tk = v as TikTokVariant;
   return [tk.hook, tk.caption, ...(tk.hashtags ?? []), tk.cta].filter(Boolean).join("\n\n");
@@ -369,10 +370,15 @@ function PlatformVariantsTabContent({ post }: { post: WeeklyContentPost }) {
                   {(v as InstagramVariant).caption && (
                     <p className="text-xs text-muted-foreground leading-relaxed">{(v as InstagramVariant).caption}</p>
                   )}
-                  {(v as InstagramVariant).carousel_text && (
-                    <p className="text-[10px] text-muted-foreground/70 italic border-t border-border/40 pt-1.5">
-                      Carousel: {(v as InstagramVariant).carousel_text}
-                    </p>
+                  {(v as InstagramVariant).carousel && (v as InstagramVariant).carousel!.length > 0 && (
+                    <div className="border-t border-border/40 pt-1.5 space-y-0.5">
+                      <p className="text-[10px] font-medium text-muted-foreground/60 uppercase tracking-wide">Carousel slides</p>
+                      {(v as InstagramVariant).carousel!.map((slide, i) => (
+                        <p key={i} className="text-[10px] text-muted-foreground/70 italic pl-2">
+                          {i + 1}. {slide}
+                        </p>
+                      ))}
+                    </div>
                   )}
                   {(v as InstagramVariant).hashtags && (v as InstagramVariant).hashtags!.length > 0 && (
                     <p className="text-[10px] text-blue-600 dark:text-blue-400 font-mono">

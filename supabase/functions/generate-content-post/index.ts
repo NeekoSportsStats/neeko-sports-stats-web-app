@@ -50,6 +50,169 @@ interface PlayerCache {
   games_played: number;
 }
 
+// ── GUARANTEED PLATFORM STRUCTURE ─────────────────────────────────────────────
+
+interface PlatformVariants {
+  tiktok: {
+    hook: string;
+    caption: string;
+    hashtags: string[];
+    cta: string;
+  };
+  instagram: {
+    hook: string;
+    caption: string;
+    hashtags: string[];
+    carousel: string[];
+  };
+  reddit: {
+    title: string;
+    body: string;
+  };
+}
+
+function buildEmptyPlatforms(playerName: string, category: string, team: string): PlatformVariants {
+  return {
+    tiktok: {
+      hook: `${category} alert: ${playerName} is your edge this round.`,
+      caption: `${playerName} (${team}) is this week's ${category} pick. Data backs it — full breakdown at Neeko Sports.`,
+      hashtags: ["#AFLFantasy", "#NeekoSports", "#AFL", "#FantasyTips", "#FantasyFootball"],
+      cta: "Full breakdown — link in bio.",
+    },
+    instagram: {
+      hook: `${playerName} is your ${category} edge this week.`,
+      caption: `${playerName} (${team}) — ${category} pick of the week.\n\nFull analysis at Neeko Sports — link in bio.`,
+      hashtags: ["#AFLFantasy", "#NeekoSports", "#AFL", "#FantasyFootball", "#AFLFantasyTips"],
+      carousel: [
+        `${playerName} — ${category.toUpperCase()}`,
+        "Data analysis",
+        "Full breakdown at Neeko Sports",
+        "Link in bio",
+      ],
+    },
+    reddit: {
+      title: `[Data] ${playerName} flagged as ${category} pick by Neeko model this round`,
+      body: `Neeko model has flagged ${playerName} (${team}) as a ${category} pick this round. Projection looking solid. Worth a look before lockout — anyone else seeing this in their data?`,
+    },
+  };
+}
+
+function normalisePlatformVariants(
+  raw: Record<string, unknown>,
+  playerName: string,
+  category: string,
+  team: string,
+): PlatformVariants {
+  const voice = typeof raw.voice_script === "string" ? raw.voice_script : "";
+  const caption = typeof raw.caption_script === "string" ? raw.caption_script : "";
+  const fallback = buildEmptyPlatforms(playerName, category, team);
+
+  const rv = raw.platform_variants;
+  const v = (rv && typeof rv === "object" && !Array.isArray(rv))
+    ? rv as Record<string, unknown>
+    : {};
+
+  // ── TikTok ──────────────────────────────────────────────────────────────
+  const rawTk = v.tiktok;
+  let tiktok: PlatformVariants["tiktok"];
+  if (rawTk && typeof rawTk === "object" && !Array.isArray(rawTk)) {
+    const tk = rawTk as Record<string, unknown>;
+    tiktok = {
+      hook: (typeof tk.hook === "string" && tk.hook.trim()) ? tk.hook.trim()
+        : voice.split(".")[0]?.trim() || fallback.tiktok.hook,
+      caption: (typeof tk.caption === "string" && tk.caption.trim()) ? tk.caption.trim()
+        : voice.slice(0, 150) || fallback.tiktok.caption,
+      hashtags: Array.isArray(tk.hashtags) && tk.hashtags.length > 0
+        ? (tk.hashtags as unknown[]).map(String)
+        : fallback.tiktok.hashtags,
+      cta: (typeof tk.cta === "string" && tk.cta.trim()) ? tk.cta.trim()
+        : fallback.tiktok.cta,
+    };
+  } else if (typeof rawTk === "string" && rawTk.trim()) {
+    tiktok = { ...fallback.tiktok, caption: rawTk.trim() };
+  } else {
+    tiktok = {
+      hook: voice.split(".")[0]?.trim() || fallback.tiktok.hook,
+      caption: voice.slice(0, 150) || fallback.tiktok.caption,
+      hashtags: fallback.tiktok.hashtags,
+      cta: fallback.tiktok.cta,
+    };
+  }
+
+  // ── Instagram ────────────────────────────────────────────────────────────
+  const rawIg = v.instagram;
+  let instagram: PlatformVariants["instagram"];
+  if (rawIg && typeof rawIg === "object" && !Array.isArray(rawIg)) {
+    const ig = rawIg as Record<string, unknown>;
+    // Normalise carousel_text → carousel array
+    let carousel: string[] = [];
+    if (Array.isArray(ig.carousel)) {
+      carousel = (ig.carousel as unknown[]).map(String).filter(Boolean);
+    } else if (Array.isArray(ig.carousel_text)) {
+      carousel = (ig.carousel_text as unknown[]).map(String).filter(Boolean);
+    } else if (typeof ig.carousel_text === "string" && ig.carousel_text.trim()) {
+      carousel = ig.carousel_text.split("|").map((s: string) => s.trim()).filter(Boolean);
+    }
+    if (carousel.length === 0) carousel = fallback.instagram.carousel;
+
+    instagram = {
+      hook: (typeof ig.hook === "string" && ig.hook.trim()) ? ig.hook.trim()
+        : caption.split("\n")[0]?.trim() || fallback.instagram.hook,
+      caption: (typeof ig.caption === "string" && ig.caption.trim()) ? ig.caption.trim()
+        : caption.slice(0, 200) || fallback.instagram.caption,
+      hashtags: Array.isArray(ig.hashtags) && ig.hashtags.length > 0
+        ? (ig.hashtags as unknown[]).map(String)
+        : fallback.instagram.hashtags,
+      carousel,
+    };
+  } else if (typeof rawIg === "string" && rawIg.trim()) {
+    instagram = { ...fallback.instagram, caption: rawIg.trim() };
+  } else {
+    instagram = {
+      hook: caption.split("\n")[0]?.trim() || fallback.instagram.hook,
+      caption: caption.slice(0, 200) || fallback.instagram.caption,
+      hashtags: fallback.instagram.hashtags,
+      carousel: fallback.instagram.carousel,
+    };
+  }
+
+  // ── Reddit ───────────────────────────────────────────────────────────────
+  const rawRd = v.reddit;
+  let reddit: PlatformVariants["reddit"];
+  if (rawRd && typeof rawRd === "object" && !Array.isArray(rawRd)) {
+    const rd = rawRd as Record<string, unknown>;
+    reddit = {
+      title: (typeof rd.title === "string" && rd.title.trim()) ? rd.title.trim()
+        : fallback.reddit.title,
+      body: (typeof rd.body === "string" && rd.body.trim()) ? rd.body.trim()
+        : `Data-driven analysis: ${voice.slice(0, 300)} Worth considering before lockout — what's everyone else seeing?`,
+    };
+  } else if (typeof rawRd === "string" && rawRd.trim()) {
+    reddit = { title: fallback.reddit.title, body: rawRd.trim() };
+  } else {
+    reddit = {
+      title: fallback.reddit.title,
+      body: `Data-driven analysis: ${voice.slice(0, 300)} Worth considering before lockout — what's everyone else seeing?`,
+    };
+  }
+
+  return { tiktok, instagram, reddit };
+}
+
+function isPlatformEmpty(platforms: PlatformVariants): boolean {
+  const { tiktok, instagram, reddit } = platforms;
+  return (
+    !tiktok.hook.trim() ||
+    !tiktok.caption.trim() ||
+    !instagram.hook.trim() ||
+    !instagram.caption.trim() ||
+    !reddit.title.trim() ||
+    !reddit.body.trim()
+  );
+}
+
+// ── SYSTEM PROMPT ─────────────────────────────────────────────────────────────
+
 function buildSystemPrompt(): string {
   return `You are an elite AFL Fantasy strategist, performance marketer, and creative director for Neeko Sports. You produce PREMIUM content — not templates, not patterns, not filler.
 
@@ -129,7 +292,7 @@ VISUAL PLAN RULES — THIS IS THE MOST IMPORTANT FIELD:
 IMAGE PROMPT RULES (ai_image_prompt field):
 - Write an ultra-high-end Midjourney/DALL-E/Ideogram image brief that a professional creative director would approve.
 - Style: "Ultra-realistic sports editorial" OR "ESPN/Fox Sports graphic design" — pick the one that fits.
-- Structure it exactly as: "Style: [descriptor]. Subject: [player name], [pose/action], [jersey/team colours]. Camera: [angle — low angle, eye-level, overhead]. Lighting: [stadium lighting/dramatic rim light/cinematic contrast]. Composition: [rule of thirds/hero centre/split-screen]. Background: [MCG/stadium crowd blur/dark gradient]. Details: [specific jersey, motion blur, sweat, intensity]. Text overlay: [exact bold headline words — max 5 words]. Stats bar: [$price, projection Xpts, value score]. Colour palette: dark #0D0D0D background, team primary colour, green accent #00C853. Mood: [urgent/analytical/dramatic/celebratory]. Brand: Neeko Sports logo bottom-right, white on dark."
+- Structure: "Style: [descriptor]. Subject: [player name], [pose/action], [jersey/team colours]. Camera: [angle — low angle, eye-level, overhead]. Lighting: [stadium lighting/dramatic rim light/cinematic contrast]. Composition: [rule of thirds/hero centre/split-screen]. Background: [MCG/stadium crowd blur/dark gradient]. Details: [specific jersey, motion blur, sweat, intensity]. Text overlay: [exact bold headline words — max 5 words]. Stats bar: [$price, projection Xpts, value score]. Colour palette: dark #0D0D0D background, team primary colour, green accent #00C853. Mood: [urgent/analytical/dramatic/celebratory]. Brand: Neeko Sports logo bottom-right, white on dark."
 - Player name and team must appear in the prompt.
 - Under 130 words. Every field filled — no vague descriptors.
 
@@ -159,6 +322,20 @@ CONVERSION SCORE — assign X.X out of 10:
 - Includes specific proof/data (real numbers): +2
 - Strong CTA (clear next action): +2
 - Emotional trigger (FOMO, fear, pride, identity): +2
+
+PLATFORM VARIANTS — CRITICAL REQUIREMENTS:
+- ALL THREE platforms (tiktok, instagram, reddit) MUST be populated.
+- NEVER leave any field empty or as a placeholder.
+- tiktok.hook: under 10 words, immediate tension or curiosity
+- tiktok.caption: 1-2 punchy lines with numbers
+- tiktok.hashtags: exactly 5 hashtags including #AFLFantasy and #NeekoSports
+- tiktok.cta: single action, e.g. "Full breakdown — link in bio."
+- instagram.hook: bold opinion or surprising stat, under 15 words
+- instagram.caption: 2-3 lines, bold claim + data points
+- instagram.hashtags: exactly 6 hashtags including #AFLFantasy and #NeekoSports
+- instagram.carousel: array of 4 slide texts ["Slide 1 headline", "Slide 2 stat", "Slide 3 verdict", "Slide 4 CTA"]
+- reddit.title: r/AFLFantasy post title — data-led, no promotional language
+- reddit.body: 3-5 sentences, genuine community post tone, ends with a question
 
 OUTPUT: Valid JSON only. No markdown. No extra text.`;
 }
@@ -221,6 +398,7 @@ Consistency: ${Math.round(player2.consistency)}%`
     Top3: "This is a TOP 3 post. Present the top 3 ranked picks for this game day. Make it feel definitive — the audience should save and share this.",
     Injury: "This is an INJURY ALERT post. Create urgency around a replacement opportunity. Give 3 clear alternatives with projections and prices.",
     Conversation: "This is a CONVERSATION post. Ask a sharp question or run a poll. No player stats needed. Drive comment engagement above all else.",
+    Engagement: "This is an ENGAGEMENT post. Ask a sharp question, run a poll, or spark a debate. Pick a controversial topic in AFL Fantasy. Drive comments above all else.",
   };
 
   const instruction = categoryInstructions[post.category] ?? categoryInstructions.Value;
@@ -239,6 +417,9 @@ ${playerInfo}${player2Info}${aiSummarySection}
 
 ---
 
+CRITICAL: The platform_variants field MUST be fully populated for all three platforms.
+Every field in tiktok, instagram, and reddit must contain real content — no empty strings, no placeholders.
+
 OUTPUT FORMAT (strict JSON, no markdown):
 {
   "post_type": "${post.content_type}",
@@ -255,8 +436,8 @@ OUTPUT FORMAT (strict JSON, no markdown):
   "voice_script": "55-80 word voice script with specific numbers",
   "caption_script": "3-4 line caption with specific numbers and hashtags",
   "visual_plan": "Detailed production brief scene-by-scene or layout brief",
-  "ai_image_prompt": "Midjourney/DALL-E brief under 120 words",
-  "ai_video_prompt": "Runway/Sora/Kling scene-by-scene brief under 150 words",
+  "ai_image_prompt": "Style: ESPN sports editorial. Subject: [player name], [team jersey], explosive action pose. Camera: low angle. Lighting: dramatic stadium rim light. Composition: hero centre. Background: stadium crowd blur. Details: jersey number, motion blur. Text overlay: [MAX 5 WORDS]. Stats bar: [$price, projectionpts]. Colour palette: dark #0D0D0D, team primary, #00C853. Mood: urgent. Brand: Neeko Sports bottom-right.",
+  "ai_video_prompt": "Scene 1 (0-4s): Text '[HOOK]' slams into frame on dark background, green #00C853 flash, quick zoom. Scene 2 (4-14s): Stats count up one by one — projection, price, value score — player graphic slides in from right. Scene 3 (14-20s): CTA end card — Neeko Sports logo pulses in green, text 'Link in bio' bold white. Fade to black.",
   "strategy_json": {
     "goal": "primary goal of this post",
     "trigger": "psychological trigger being used",
@@ -266,20 +447,20 @@ OUTPUT FORMAT (strict JSON, no markdown):
   },
   "platform_variants": {
     "tiktok": {
-      "hook": "Opening line under 10 words — must create immediate tension or curiosity",
-      "caption": "TikTok caption 1-2 punchy lines with numbers, trending and urgent tone",
-      "hashtags": ["#AFLFantasy", "#NeekoSports", "#AFL", "#FantasyTips", "<2 more relevant tags>"],
-      "cta": "Single action CTA — e.g. 'Link in bio for full breakdown'"
+      "hook": "Under 10 words — real tension or specific number",
+      "caption": "1-2 punchy lines with actual numbers from the data",
+      "hashtags": ["#AFLFantasy", "#NeekoSports", "#AFL", "#FantasyTips", "#AFLRound1"],
+      "cta": "Full breakdown — link in bio."
     },
     "instagram": {
-      "hook": "Instagram hook line — bold opinion or surprising stat, under 15 words",
-      "caption": "2-3 lines. Line 1: bold claim. Lines 2-3: data points. Visual and aspirational tone.",
-      "hashtags": ["#AFLFantasy", "#NeekoSports", "#AFL", "#FantasyFootball", "<3 more relevant tags>"],
-      "carousel_text": "If applicable: slide 1 headline | slide 2 stat | slide 3 verdict | slide 4 CTA"
+      "hook": "Bold opinion or surprising stat, under 15 words",
+      "caption": "Line 1: bold claim.\nLine 2: first data point.\nLine 3: second data point.",
+      "hashtags": ["#AFLFantasy", "#NeekoSports", "#AFL", "#FantasyFootball", "#AFLFantasyTips", "#AFLRound1"],
+      "carousel": ["Slide 1: Player name + category headline", "Slide 2: Key stat", "Slide 3: Verdict", "Slide 4: Link in bio"]
     },
     "reddit": {
-      "title": "r/AFLFantasy post title — data-led, no promotional language, reads like a genuine community post",
-      "body": "3-5 sentences. Open with the data finding. No marketing tone. End with a genuine question to drive discussion. Reference Neeko model naturally if relevant."
+      "title": "r/AFLFantasy data-led title — no marketing language",
+      "body": "3-5 sentences. Open with data finding. Genuine community tone. End with a question to drive discussion."
     }
   },
   "ctas": [
@@ -300,7 +481,7 @@ hook_type must be one of: Controversy, Fear, Data-first, Contrarian, Challenge, 
 conversion_score must be a number 1.0 to 10.0
 hook_score must be a number 1.0 to 10.0
 
-Generate the complete post. No blanks, no placeholders, no generic filler.`;
+Generate the complete post. No blanks, no placeholders, no generic filler. ALL platform_variants fields must be real content.`;
 }
 
 async function callOpenAI(
@@ -311,7 +492,7 @@ async function callOpenAI(
   if (!apiKey) throw new Error("OPENAI_API_KEY not configured");
 
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 50000);
+  const timeoutId = setTimeout(() => controller.abort(), 55000);
 
   try {
     console.log("[generate-content-post] Calling OpenAI...");
@@ -326,7 +507,7 @@ async function callOpenAI(
         model: "gpt-4o",
         response_format: { type: "json_object" },
         temperature: 0.88,
-        max_tokens: 3000,
+        max_tokens: 3500,
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt },
@@ -355,13 +536,18 @@ function ensureString(val: unknown): string {
   return String(val);
 }
 
-function normaliseGeneratedPost(raw: Record<string, unknown>): Record<string, unknown> {
+function normaliseGeneratedPost(
+  raw: Record<string, unknown>,
+  playerName: string,
+  category: string,
+  team: string,
+): Record<string, unknown> {
   const hooks: string[] = Array.isArray(raw.hooks)
-    ? (raw.hooks as unknown[]).map((h) => ensureString(h)).filter(Boolean)
-    : ["Hook option 1", "Hook option 2", "Hook option 3"];
+    ? (raw.hooks as unknown[]).map(h => ensureString(h)).filter(Boolean)
+    : [`${category} alert: ${playerName} is your edge this round.`, `Everyone's sleeping on ${playerName}.`, `${playerName} — the data is clear.`];
 
   const rawCtas = Array.isArray(raw.ctas)
-    ? (raw.ctas as unknown[]).map((c) => ensureString(c)).filter(Boolean)
+    ? (raw.ctas as unknown[]).map(c => ensureString(c)).filter(Boolean)
     : [];
   const ctas = rawCtas.length >= 3 ? rawCtas.slice(0, 3) : [
     "Get the full analysis at Neeko Sports — link in bio.",
@@ -370,19 +556,19 @@ function normaliseGeneratedPost(raw: Record<string, unknown>): Record<string, un
   ];
 
   const validConfidence = ["HIGH", "MEDIUM", "LOW"];
-  const rawConf = ensureString(raw.confidence_label || raw.confidence || "");
+  const rawConf = ensureString(raw.confidence_label ?? raw.confidence ?? "");
   const confidence_label = validConfidence.includes(rawConf) ? rawConf : "MEDIUM";
 
   const validAngleLabels = ["Contrarian", "Value Edge", "Fear", "Proof", "Debate", "Breakout", "Captain Lock"];
-  const rawAngleLabel = ensureString(raw.angle_label || "");
+  const rawAngleLabel = ensureString(raw.angle_label ?? "");
   const angle_label = validAngleLabels.includes(rawAngleLabel) ? rawAngleLabel : "Value Edge";
 
   const validCreativeStyles = ["pov_stadium", "screen_proof", "data_graphic", "debate_post", "reaction_take", "comparison_reveal", "countdown_urgency", "narrative_arc"];
-  const rawStyle = ensureString(raw.creative_style || "");
+  const rawStyle = ensureString(raw.creative_style ?? "");
   const creative_style = validCreativeStyles.includes(rawStyle) ? rawStyle : "data_graphic";
 
   const validHookTypes = ["Controversy", "Fear", "Data-first", "Contrarian", "Challenge", "Identity", "Narrative"];
-  const rawHookType = ensureString(raw.hook_type || "");
+  const rawHookType = ensureString(raw.hook_type ?? "");
   const hook_type = validHookTypes.includes(rawHookType) ? rawHookType : "Data-first";
 
   const convScore = Number(raw.conversion_score ?? 0);
@@ -401,57 +587,15 @@ function normaliseGeneratedPost(raw: Record<string, unknown>): Record<string, un
         cta: "Link in bio",
       };
 
-  const rawVariants = raw.platform_variants;
-  let platformVariants: Record<string, unknown>;
-
-  if (rawVariants && typeof rawVariants === "object" && !Array.isArray(rawVariants)) {
-    const v = rawVariants as Record<string, unknown>;
-    const normalisePlatform = (p: unknown, fallbackCaption: string, fallbackHook: string): Record<string, unknown> => {
-      if (p && typeof p === "object" && !Array.isArray(p)) return p as Record<string, unknown>;
-      const text = typeof p === "string" ? p : fallbackCaption;
-      return { hook: fallbackHook, caption: text, hashtags: ["#AFLFantasy", "#NeekoSports", "#AFL"] };
-    };
-    const voice = ensureString(raw.voice_script || "");
-    const caption = ensureString(raw.caption_script || "");
-    platformVariants = {
-      tiktok: normalisePlatform(v.tiktok, voice.slice(0, 150),
-        voice.split(".")[0]?.trim() || "This is your edge this round."),
-      instagram: normalisePlatform(v.instagram, caption.slice(0, 200),
-        caption.split("\n")[0]?.trim() || "The data is clear."),
-      reddit: normalisePlatform(v.reddit,
-        `Data analysis: ${voice.slice(0, 250)}`,
-        ""),
-    };
-  } else {
-    const voice = ensureString(raw.voice_script || "");
-    const caption = ensureString(raw.caption_script || "");
-    platformVariants = {
-      tiktok: {
-        hook: voice.split(".")[0]?.trim().slice(0, 80) || "This is your edge this round.",
-        caption: voice.slice(0, 150),
-        hashtags: ["#AFLFantasy", "#NeekoSports", "#AFL", "#FantasyTips"],
-        cta: "Full breakdown — link in bio.",
-      },
-      instagram: {
-        hook: caption.split("\n")[0]?.trim() || "The data doesn't lie.",
-        caption: caption.slice(0, 200),
-        hashtags: ["#AFLFantasy", "#NeekoSports", "#AFL", "#FantasyFootball"],
-        carousel_text: "",
-      },
-      reddit: {
-        title: `[Data] ${ensureString(raw.player_name || "This player")} flagged by Neeko model this round`,
-        body: `Data-driven analysis: ${voice.slice(0, 300)} Worth considering before lockout — what's everyone else seeing?`,
-      },
-    };
-  }
+  const platformVariants = normalisePlatformVariants(raw, playerName, category, team);
 
   return {
     hooks,
-    voice_script: ensureString(raw.voice_script || raw.full_script || ""),
-    caption_script: ensureString(raw.caption_script || raw.caption || ""),
-    visual_plan: ensureString(raw.visual_plan || ""),
-    ai_image_prompt: ensureString(raw.ai_image_prompt || raw.image_prompt || ""),
-    ai_video_prompt: ensureString(raw.ai_video_prompt || raw.video_prompt || ""),
+    voice_script: ensureString(raw.voice_script ?? raw.full_script ?? ""),
+    caption_script: ensureString(raw.caption_script ?? raw.caption ?? ""),
+    visual_plan: ensureString(raw.visual_plan ?? ""),
+    ai_image_prompt: ensureString(raw.ai_image_prompt ?? raw.image_prompt ?? ""),
+    ai_video_prompt: ensureString(raw.ai_video_prompt ?? raw.video_prompt ?? ""),
     creative_style,
     angle_label,
     confidence_label,
@@ -472,7 +616,6 @@ Deno.serve(async (req: Request) => {
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-
 
     const db = createClient(supabaseUrl, serviceKey, {
       auth: { persistSession: false, autoRefreshToken: false },
@@ -565,19 +708,26 @@ Deno.serve(async (req: Request) => {
       }
     }
 
+    const playerName = postRow.player_name ?? "Unknown";
+    const category = postRow.category ?? "Value";
+    const team = postRow.team ?? "Unknown";
+
     const apiKey = Deno.env.get("OPENAI_API_KEY");
+
+    // ── No API key — use structured fallback ─────────────────────────────────
     if (!apiKey) {
+      const fallbackPlatforms = buildEmptyPlatforms(playerName, category, team);
       const fallback = {
         hooks: [
-          `${postRow.player_name ?? "This player"} is undervalued right now — the data proves it.`,
-          `Everyone's sleeping on ${postRow.player_name ?? "this player"} this round.`,
-          `${postRow.category} alert: ${postRow.player_name ?? "this player"} is your edge this week.`,
+          `${playerName} is undervalued right now — the data proves it.`,
+          `Everyone's sleeping on ${playerName} this round.`,
+          `${category} alert: ${playerName} is your edge this week.`,
         ],
-        voice_script: `${postRow.player_name ?? "This player"} is one of the most interesting ${postRow.category} options this round. The data backs it up — and Neeko Sports has the full breakdown. Link in bio.`,
-        caption_script: `${postRow.category} pick of the week: ${postRow.player_name ?? "TBD"} (${postRow.team ?? "TBD"}).\n\nCheck the full analysis at Neeko Sports — link in bio.\n\n#AFLFantasy #NeekoSports #AFL`,
-        visual_plan: `Scene 1 (0-3s): Bold text overlay "${postRow.player_name ?? "PLAYER"}" on dark background with green (#00C853) accent. Scene 2 (3-8s): Stats reveal — projection, value score, price. Scene 3 (8-15s): CTA — "Full analysis at Neeko Sports". Neeko logo bottom right.`,
-        ai_image_prompt: `Style: graphic design. Subject: ${postRow.player_name ?? "AFL player"} (${postRow.team ?? "AFL team"}) — ${postRow.category} pick. Colours: dark background, green #00C853 accent. Text overlay: "${postRow.player_name ?? "PLAYER"} — ${postRow.category.toUpperCase()}". Composition: bold typography, player stat highlight. Mood: analytical, urgent.`,
-        ai_video_prompt: `Scene 1 (0-3s): Dark background, text animates in "${postRow.player_name ?? "PLAYER"}" — zoom effect. Scene 2 (3-10s): Stats appear one by one — projection, price, value. Green accent pulses. Scene 3 (10-15s): CTA end card — "Neeko Sports — link in bio". Fade out.`,
+        voice_script: `${playerName} is one of the most interesting ${category} options this round. The data backs it up — and Neeko Sports has the full breakdown. Link in bio.`,
+        caption_script: `${category} pick of the week: ${playerName} (${team}).\n\nCheck the full analysis at Neeko Sports — link in bio.\n\n#AFLFantasy #NeekoSports #AFL`,
+        visual_plan: `Scene 1 (0-3s): Bold text overlay "${playerName}" on dark background with green (#00C853) accent. Scene 2 (3-8s): Stats reveal — projection, value score, price. Scene 3 (8-15s): CTA — "Full analysis at Neeko Sports". Neeko logo bottom right.`,
+        ai_image_prompt: `Style: ESPN sports editorial. Subject: ${playerName} (${team}), explosive action pose, team jersey. Camera: low angle. Lighting: dramatic stadium rim light. Composition: hero centre. Background: stadium crowd blur. Text overlay: "${playerName.split(" ")[1] ?? playerName} — ${category.toUpperCase()}". Stats bar: [price, projectionpts]. Colour palette: dark #0D0D0D, team primary, #00C853. Mood: urgent. Brand: Neeko Sports logo bottom-right.`,
+        ai_video_prompt: `Scene 1 (0-4s): Text "${playerName}" slams in on dark background, green #00C853 flash, fast zoom. Scene 2 (4-14s): Stats count up — projection, price, value score — player graphic slides in from right. Scene 3 (14-20s): CTA end card — Neeko Sports logo pulses green, "Link in bio" in bold white. Fade to black.`,
         creative_style: "data_graphic",
         angle_label: "Value Edge",
         confidence_label: "MEDIUM",
@@ -591,24 +741,7 @@ Deno.serve(async (req: Request) => {
           best_posting_time: "8am-9am weekday",
           cta: "Link in bio",
         },
-        platform_variants: {
-          tiktok: {
-            hook: `${postRow.category} alert: ${postRow.player_name ?? "TBD"} is your edge this round.`,
-            caption: `Quick ${postRow.category} pick breakdown — ${postRow.player_name ?? "TBD"} this round. Full data at Neeko Sports.`,
-            hashtags: ["#AFLFantasy", "#NeekoSports", "#AFL", "#FantasyTips"],
-            cta: "Full breakdown — link in bio.",
-          },
-          instagram: {
-            hook: `${postRow.player_name ?? "TBD"} is your ${postRow.category} edge this week.`,
-            caption: `${postRow.player_name ?? "TBD"} (${postRow.team ?? "AFL"}) — ${postRow.category} pick of the week. Full analysis at Neeko Sports — link in bio.`,
-            hashtags: ["#AFLFantasy", "#NeekoSports", "#AFL", "#FantasyFootball"],
-            carousel_text: "",
-          },
-          reddit: {
-            title: `[Data] ${postRow.player_name ?? "TBD"} flagged as ${postRow.category} by Neeko model this round`,
-            body: `Neeko model has flagged ${postRow.player_name ?? "TBD"} (${postRow.team ?? "AFL"}) as a ${postRow.category} pick this round. Projection looking solid. Worth a look before lockout — anyone else seeing this?`,
-          },
-        },
+        platform_variants: fallbackPlatforms,
         ctas: [
           "Get the full analysis at Neeko Sports — link in bio.",
           "Drop your take below 👇",
@@ -618,11 +751,7 @@ Deno.serve(async (req: Request) => {
 
       await db
         .from("weekly_content_posts")
-        .update({
-          ...fallback,
-          status: "ready",
-          updated_at: new Date().toISOString(),
-        })
+        .update({ ...fallback, status: "ready", updated_at: new Date().toISOString() })
         .eq("id", postId);
 
       const { data: updatedPost } = await db
@@ -631,57 +760,115 @@ Deno.serve(async (req: Request) => {
         .eq("id", postId)
         .maybeSingle();
 
-      console.log(`[generate-content-post] Fallback generated for post ${postId}`);
+      console.log(`[generate-content-post] Fallback (no API key) generated for post ${postId}`);
       return new Response(
         JSON.stringify({ post: updatedPost }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
 
+    // ── OpenAI generation with retry ─────────────────────────────────────────
+    const systemPrompt = buildSystemPrompt();
+    const userPrompt = buildUserPrompt(postRow as PostRow, playerData, player2Data, aiSummary);
+
+    let rawResult: Record<string, unknown>;
+    let normalised: Record<string, unknown>;
+
     try {
-      const systemPrompt = buildSystemPrompt();
-      const userPrompt = buildUserPrompt(postRow as PostRow, playerData, player2Data, aiSummary);
-      const rawResult = await callOpenAI(systemPrompt, userPrompt);
-      const normalised = normaliseGeneratedPost(rawResult);
+      rawResult = await callOpenAI(systemPrompt, userPrompt);
+      normalised = normaliseGeneratedPost(rawResult, playerName, category, team);
 
-      await db
-        .from("weekly_content_posts")
-        .update({
-          ...normalised,
-          status: "ready",
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", postId);
+      // ── Retry if platforms are empty ───────────────────────────────────────
+      const platforms = normalised.platform_variants as PlatformVariants;
+      if (isPlatformEmpty(platforms)) {
+        console.warn(`[generate-content-post] Platform fields empty for ${postId}, retrying...`);
+        try {
+          const retryResult = await callOpenAI(systemPrompt, userPrompt);
+          const retryNormalised = normaliseGeneratedPost(retryResult, playerName, category, team);
+          const retryPlatforms = retryNormalised.platform_variants as PlatformVariants;
 
-      const { data: updatedPost } = await db
-        .from("weekly_content_posts")
-        .select("*")
-        .eq("id", postId)
-        .maybeSingle();
-
-      console.log(`[generate-content-post] Success for post ${postId}`);
-      return new Response(
-        JSON.stringify({ post: updatedPost }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
-      );
+          if (!isPlatformEmpty(retryPlatforms)) {
+            normalised = retryNormalised;
+            console.log(`[generate-content-post] Retry succeeded for ${postId}`);
+          } else {
+            // Merge: keep retry text fields but force filled platforms
+            const filled = buildEmptyPlatforms(playerName, category, team);
+            const merged: PlatformVariants = {
+              tiktok: {
+                hook: retryPlatforms.tiktok.hook || filled.tiktok.hook,
+                caption: retryPlatforms.tiktok.caption || filled.tiktok.caption,
+                hashtags: retryPlatforms.tiktok.hashtags.length > 0 ? retryPlatforms.tiktok.hashtags : filled.tiktok.hashtags,
+                cta: retryPlatforms.tiktok.cta || filled.tiktok.cta,
+              },
+              instagram: {
+                hook: retryPlatforms.instagram.hook || filled.instagram.hook,
+                caption: retryPlatforms.instagram.caption || filled.instagram.caption,
+                hashtags: retryPlatforms.instagram.hashtags.length > 0 ? retryPlatforms.instagram.hashtags : filled.instagram.hashtags,
+                carousel: retryPlatforms.instagram.carousel.length > 0 ? retryPlatforms.instagram.carousel : filled.instagram.carousel,
+              },
+              reddit: {
+                title: retryPlatforms.reddit.title || filled.reddit.title,
+                body: retryPlatforms.reddit.body || filled.reddit.body,
+              },
+            };
+            normalised = { ...retryNormalised, platform_variants: merged };
+            console.warn(`[generate-content-post] Used merged fallback platforms for ${postId}`);
+          }
+        } catch (retryErr) {
+          console.error(`[generate-content-post] Retry failed for ${postId}:`, retryErr);
+          // Keep first result but force fill platform gaps
+          const filled = buildEmptyPlatforms(playerName, category, team);
+          normalised = { ...normalised, platform_variants: filled };
+        }
+      }
     } catch (genErr) {
       const errMsg = genErr instanceof Error ? genErr.message : String(genErr);
       console.error(`[generate-content-post] Generation failed for ${postId}:`, errMsg);
 
-      await db
-        .from("weekly_content_posts")
-        .update({
-          status: "error",
-          error_message: errMsg.slice(0, 500),
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", postId);
+      // ── Generation failure: try with different player approach ───────────
+      try {
+        console.log(`[generate-content-post] Attempting recovery generation for ${postId}...`);
+        const recoveryResult = await callOpenAI(systemPrompt, userPrompt);
+        normalised = normaliseGeneratedPost(recoveryResult, playerName, category, team);
+        console.log(`[generate-content-post] Recovery succeeded for ${postId}`);
+      } catch (_recoveryErr) {
+        // Both attempts failed — write error status and return
+        await db
+          .from("weekly_content_posts")
+          .update({
+            status: "error",
+            error_message: errMsg.slice(0, 500),
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", postId);
 
-      return new Response(
-        JSON.stringify({ error: "Request failed", post_id: postId }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-      );
+        return new Response(
+          JSON.stringify({ error: "Generation failed after retry", post_id: postId }),
+          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
     }
+
+    await db
+      .from("weekly_content_posts")
+      .update({
+        ...normalised,
+        status: "ready",
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", postId);
+
+    const { data: updatedPost } = await db
+      .from("weekly_content_posts")
+      .select("*")
+      .eq("id", postId)
+      .maybeSingle();
+
+    console.log(`[generate-content-post] Success for post ${postId}`);
+    return new Response(
+      JSON.stringify({ post: updatedPost }),
+      { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+    );
   } catch (err) {
     console.error("[generate-content-post] Fatal error:", err);
     return new Response(

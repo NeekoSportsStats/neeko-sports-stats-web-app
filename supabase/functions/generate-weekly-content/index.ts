@@ -43,20 +43,30 @@ interface ProofPlayer {
   accuracy_gap: number;
 }
 
+// ── WEEKLY STRUCTURE (fixed, per spec) ────────────────────────────────────────
+// Monday:    VALUE, TRAP, BREAKOUT
+// Tuesday:   BREAKOUT, VALUE, ENGAGEMENT
+// Wednesday: CONVERSATION, VALUE, BREAKOUT
+// Thursday:  INJURY, VALUE, TRAP
+// Friday:    TOP3, TOP3, TOP3  (only day with 3 Top3)
+// Saturday:  TOP3, TOP3, BREAKOUT
+// Sunday:    PROOF, PROOF, VALUE
+// ─────────────────────────────────────────────────────────────────────────────
+
 const DAY_CONFIGS = [
   {
     label: "monday",
     display: "Monday",
-    categories: ["Value", "Proof", "Breakout"] as const,
-    angles: ["hidden_edge", "we_called_it", "market_inefficiency"] as const,
-    content_types: ["Graphic Post", "Screen Recording", "Short-form Video"] as const,
+    categories: ["Value", "Trap", "Breakout"] as const,
+    angles: ["hidden_edge", "trap_warning", "market_inefficiency"] as const,
+    content_types: ["Graphic Post", "Callout Post", "Short-form Video"] as const,
   },
   {
     label: "tuesday",
     display: "Tuesday",
-    categories: ["Breakout", "Proof", "Trap"] as const,
-    angles: ["market_inefficiency", "proof", "trap_warning"] as const,
-    content_types: ["Short-form Video", "Screen Recording", "Callout Post"] as const,
+    categories: ["Breakout", "Value", "Engagement"] as const,
+    angles: ["market_inefficiency", "hidden_edge", "conversation"] as const,
+    content_types: ["Short-form Video", "Graphic Post", "Conversation Post"] as const,
   },
   {
     label: "wednesday",
@@ -75,23 +85,23 @@ const DAY_CONFIGS = [
   {
     label: "friday",
     display: "Friday",
-    categories: ["Top3", "H2H", "Value"] as const,
-    angles: ["top3_friday", "h2h", "hidden_edge"] as const,
-    content_types: ["Top 3 Post", "H2H Post", "Graphic Post"] as const,
+    categories: ["Top3", "Top3", "Top3"] as const,
+    angles: ["top3_friday", "top3_friday", "top3_friday"] as const,
+    content_types: ["Top 3 Post", "Top 3 Post", "Top 3 Post"] as const,
   },
   {
     label: "saturday",
     display: "Saturday",
-    categories: ["Top3", "Breakout", "Trap"] as const,
-    angles: ["top3_saturday", "market_inefficiency", "trap_warning"] as const,
-    content_types: ["Top 3 Post", "Short-form Video", "Callout Post"] as const,
+    categories: ["Top3", "Top3", "Breakout"] as const,
+    angles: ["top3_saturday", "top3_saturday", "market_inefficiency"] as const,
+    content_types: ["Top 3 Post", "Top 3 Post", "Short-form Video"] as const,
   },
   {
     label: "sunday",
     display: "Sunday",
-    categories: ["Proof", "Proof", "Conversation"] as const,
-    angles: ["we_called_it", "proof", "conversation"] as const,
-    content_types: ["Screen Recording", "Screen Recording", "Conversation Post"] as const,
+    categories: ["Proof", "Proof", "Value"] as const,
+    angles: ["we_called_it", "proof", "hidden_edge"] as const,
+    content_types: ["Screen Recording", "Screen Recording", "Graphic Post"] as const,
   },
 ];
 
@@ -100,7 +110,7 @@ function getWeekKey(): string {
   const year = now.getFullYear();
   const startOfYear = new Date(year, 0, 1);
   const week = Math.ceil(
-    ((now.getTime() - startOfYear.getTime()) / 86400000 + startOfYear.getDay() + 1) / 7
+    ((now.getTime() - startOfYear.getTime()) / 86400000 + startOfYear.getDay() + 1) / 7,
   );
   return `${year}-W${String(week).padStart(2, "0")}`;
 }
@@ -113,12 +123,25 @@ function getWeekStartDate(): string {
   return monday.toISOString().split("T")[0];
 }
 
+// ── CATEGORY FILTER CONSTANTS ─────────────────────────────────────────────────
 const VALUE_MIN_VALUE_SCORE = 5;
 const VALUE_MAX_BUST_RISK = 6;
 const TRAP_MAX_VALUE_SCORE = 4;
 const TRAP_MIN_BUST_RISK = 6;
 const BREAKOUT_MIN_UPSIDE = 8;
 const BREAKOUT_MIN_FORM = 55;
+
+// Processing priority: lower = picked first (gets best players)
+const CATEGORY_PRIORITY: Record<string, number> = {
+  Top3: 0,
+  Value: 1,
+  Breakout: 2,
+  Trap: 3,
+  Engagement: 3,
+  Conversation: 4,
+  Proof: 5,
+  Injury: 5,
+};
 
 type PostSelection = {
   player_id: number;
@@ -149,28 +172,38 @@ function selectPlayersForDay(
   const available = () => players.filter(p => !usedPlayerIds.has(p.player_id));
 
   const byRank = () => [...available()].sort((a, b) => b.rank - a.rank);
-  const byValue = () => [...available()].filter(p =>
-    p.value_score >= VALUE_MIN_VALUE_SCORE && p.risk_rating <= VALUE_MAX_BUST_RISK
-  ).sort((a, b) => b.value_score - a.value_score);
-  const byBreakout = () => [...available()].filter(p =>
-    (p.upside_pct >= BREAKOUT_MIN_UPSIDE || p.form_score >= BREAKOUT_MIN_FORM) &&
-    p.value_score >= VALUE_MIN_VALUE_SCORE
-  ).sort((a, b) => b.upside_pct - a.upside_pct);
-  const byTrap = () => [...available()].filter(p =>
-    p.value_score <= TRAP_MAX_VALUE_SCORE && p.risk_rating >= TRAP_MIN_BUST_RISK
-  ).sort((a, b) => b.risk_rating - a.risk_rating);
+
+  const byValue = () =>
+    [...available()]
+      .filter(p => p.value_score >= VALUE_MIN_VALUE_SCORE && p.risk_rating <= VALUE_MAX_BUST_RISK)
+      .sort((a, b) => b.value_score - a.value_score);
+
+  const byBreakout = () =>
+    [...available()]
+      .filter(
+        p =>
+          (p.upside_pct >= BREAKOUT_MIN_UPSIDE || p.form_score >= BREAKOUT_MIN_FORM) &&
+          p.value_score >= VALUE_MIN_VALUE_SCORE,
+      )
+      .sort((a, b) => b.upside_pct - a.upside_pct);
+
+  const byTrap = () =>
+    [...available()]
+      .filter(p => p.value_score <= TRAP_MAX_VALUE_SCORE && p.risk_rating >= TRAP_MIN_BUST_RISK)
+      .sort((a, b) => b.risk_rating - a.risk_rating);
+
   const byCaptain = () => [...available()].sort((a, b) => b.captain_score - a.captain_score);
 
-  const CATEGORY_PRIORITY: Record<string, number> = {
-    Value: 1, Breakout: 2, Trap: 3, Top3: 0,
-    H2H: 1, Proof: 4, Injury: 4, Conversation: 2,
-  };
-
+  // Sort slots by priority so best-player-pools are consumed first
   const slotsWithIndex = config.categories.map((cat, idx) => ({
-    cat, angle: config.angles[idx], content_type: config.content_types[idx], slotIndex: idx,
+    cat,
+    angle: config.angles[idx],
+    content_type: config.content_types[idx],
+    slotIndex: idx,
   }));
+
   const processingOrder = [...slotsWithIndex].sort(
-    (a, b) => (CATEGORY_PRIORITY[a.cat] ?? 5) - (CATEGORY_PRIORITY[b.cat] ?? 5)
+    (a, b) => (CATEGORY_PRIORITY[a.cat] ?? 5) - (CATEGORY_PRIORITY[b.cat] ?? 5),
   );
 
   const resultMap = new Map<number, PostSelection>();
@@ -181,21 +214,22 @@ function selectPlayersForDay(
 
     if (cat === "Top3") {
       const topPool = byCaptain();
-      selectedPlayer = topPool[slotIndex % Math.max(topPool.length, 1)];
+      // Use slotIndex to spread Top3 across different players on the same day
+      const dayTop3Count = [...resultMap.values()].filter(r => r.category === "Top3").length;
+      selectedPlayer = topPool[dayTop3Count] ?? topPool[0];
+      // For Top3, we mark as used only AFTER we record the result (shared pool logic below)
     } else if (cat === "H2H") {
       const captains = byCaptain();
       selectedPlayer = captains[0];
       player2 = captains[1];
       if (player2) usedPlayerIds.add(player2.player_id);
     } else if (cat === "Value") {
-      selectedPlayer = pickFresh(byValue(), usedPlayerIds)
-        ?? pickFresh(byRank(), usedPlayerIds);
+      selectedPlayer = pickFresh(byValue(), usedPlayerIds) ?? pickFresh(byRank(), usedPlayerIds);
     } else if (cat === "Breakout") {
-      selectedPlayer = pickFresh(byBreakout(), usedPlayerIds)
-        ?? pickFresh(byRank(), usedPlayerIds);
+      selectedPlayer =
+        pickFresh(byBreakout(), usedPlayerIds) ?? pickFresh(byRank(), usedPlayerIds);
     } else if (cat === "Trap") {
-      selectedPlayer = pickFresh(byTrap(), usedPlayerIds)
-        ?? pickFresh(byRank(), usedPlayerIds);
+      selectedPlayer = pickFresh(byTrap(), usedPlayerIds) ?? pickFresh(byRank(), usedPlayerIds);
     } else if (cat === "Proof") {
       const proofAvail = proofPlayers.filter(p => !usedPlayerIds.has(p.player_id));
       if (proofAvail.length > 0) {
@@ -229,13 +263,15 @@ function selectPlayersForDay(
       } else {
         selectedPlayer = pickFresh(byRank(), usedPlayerIds);
       }
-    } else if (cat === "Injury" || cat === "Conversation") {
+    } else if (cat === "Engagement" || cat === "Conversation") {
+      selectedPlayer = pickFresh(byRank(), usedPlayerIds);
+    } else if (cat === "Injury") {
       selectedPlayer = pickFresh(byRank(), usedPlayerIds);
     } else {
-      selectedPlayer = pickFresh(byValue(), usedPlayerIds)
-        ?? pickFresh(byRank(), usedPlayerIds);
+      selectedPlayer = pickFresh(byValue(), usedPlayerIds) ?? pickFresh(byRank(), usedPlayerIds);
     }
 
+    // Absolute fallback — always fill a slot
     if (!selectedPlayer) {
       selectedPlayer = pickFresh(byRank(), usedPlayerIds) ?? players[0];
     }
@@ -256,19 +292,28 @@ function selectPlayersForDay(
     });
   }
 
+  // Reconstruct in original slot order
   const posts: PostSelection[] = [];
   for (let i = 0; i < 3; i++) {
     posts.push(resultMap.get(i)!);
   }
 
+  // ── Per-day dedup safety pass ─────────────────────────────────────────────
   const dayPlayerIds = new Set<number>();
   const safe = posts.map(post => {
-    if (dayPlayerIds.has(post.player_id)) {
-      const fallback = players.find(p => !usedPlayerIds.has(p.player_id) && !dayPlayerIds.has(p.player_id));
+    if (post.player_id && dayPlayerIds.has(post.player_id)) {
+      const fallback = players.find(
+        p => !usedPlayerIds.has(p.player_id) && !dayPlayerIds.has(p.player_id),
+      );
       if (fallback) {
         usedPlayerIds.add(fallback.player_id);
         dayPlayerIds.add(fallback.player_id);
-        return { ...post, player_id: fallback.player_id, player_name: fallback.player_name, team: fallback.team };
+        return {
+          ...post,
+          player_id: fallback.player_id,
+          player_name: fallback.player_name,
+          team: fallback.team,
+        };
       }
     }
     if (post.player_id) dayPlayerIds.add(post.player_id);
@@ -295,13 +340,8 @@ Deno.serve(async (req: Request) => {
     }
 
     const db = createClient(supabaseUrl, serviceKey, {
-      auth: {
-        persistSession: false,
-        autoRefreshToken: false,
-      },
-      db: {
-        schema: "public",
-      },
+      auth: { persistSession: false, autoRefreshToken: false },
+      db: { schema: "public" },
     });
 
     const body = await req.json().catch(() => ({}));
@@ -414,15 +454,11 @@ Deno.serve(async (req: Request) => {
     console.log(`[plan-builder] Starting for week ${weekKey}, force=${forceRegenerate}`);
 
     if (!forceRegenerate) {
-      const { data: existing, error: existingErr } = await db
+      const { data: existing } = await db
         .from("weekly_content_plans")
         .select("id, week_key")
         .eq("week_key", weekKey)
         .maybeSingle();
-
-      if (existingErr) {
-        console.error("[plan-builder] Check existing error:", existingErr.message);
-      }
 
       if (existing?.id) {
         const { data: posts } = await db
@@ -432,28 +468,27 @@ Deno.serve(async (req: Request) => {
           .order("day_key")
           .order("slot_key");
 
-        console.log(`[plan-builder] Returning existing plan ${existing.id} with ${posts?.length ?? 0} posts`);
-        return new Response(JSON.stringify({ plan_id: existing.id, week_key: weekKey, posts: posts ?? [] }), {
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
+        const postCount = posts?.length ?? 0;
+        console.log(`[plan-builder] Found existing plan ${existing.id} with ${postCount} posts`);
+
+        // If plan is incomplete (< 21 posts), regenerate
+        if (postCount >= 21) {
+          return new Response(
+            JSON.stringify({ plan_id: existing.id, week_key: weekKey, posts: posts ?? [] }),
+            { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+          );
+        }
+        console.log(`[plan-builder] Plan incomplete (${postCount}/21), rebuilding...`);
       }
     }
 
     console.log("[plan-builder] Fetching player data from afl.player_rankings_cache...");
 
     const aflDb = createClient(supabaseUrl, serviceKey, {
-      auth: {
-        persistSession: false,
-        autoRefreshToken: false,
-      },
-      db: {
-        schema: "afl",
-      },
+      auth: { persistSession: false, autoRefreshToken: false },
+      db: { schema: "afl" },
     });
 
-    // Fix: "rank" column does not exist in afl.player_rankings_cache.
-    // Use neeko_rating_scaled (higher = better) as the ranking proxy.
-    // Order descending so top-rated players come first.
     const { data: rawPlayers, error: playersError } = await aflDb
       .from("player_rankings_cache")
       .select(`
@@ -466,14 +501,14 @@ Deno.serve(async (req: Request) => {
       .eq("is_available", true)
       .not("projection_final", "is", null)
       .order("neeko_rating_scaled", { ascending: false })
-      .limit(60);
+      .limit(80);
 
     if (playersError) {
       console.error("[plan-builder] Player fetch error:", playersError.message);
       throw new Error(`Player fetch failed: ${playersError.message}`);
     }
 
-    const mappedPlayers: PlayerData[] = (rawPlayers ?? []).map((p) => ({
+    const mappedPlayers: PlayerData[] = (rawPlayers ?? []).map(p => ({
       player_id: p.player_id,
       player_name: p.player_name ?? "Unknown",
       team: p.team ?? "Unknown",
@@ -486,7 +521,6 @@ Deno.serve(async (req: Request) => {
       price_change: Number(p.price_change ?? 0),
       value_score: Number(p.value_score ?? 0),
       best_value_score: Number(p.best_value_score ?? 0),
-      // Store neeko_rating_scaled in rank field — higher = better (sort descending in selectPlayersForDay)
       rank: Number(p.neeko_rating_scaled ?? 0),
       form_score: Number(p.form_score ?? 0),
       consistency: Number(p.consistency ?? 0),
@@ -501,12 +535,12 @@ Deno.serve(async (req: Request) => {
       games_played: Number(p.games_played ?? 0),
     }));
 
-    console.log(`[plan-builder] Mapped ${mappedPlayers.length} players. Top player: ${mappedPlayers[0]?.player_name ?? "none"} (neeko_rating_scaled=${mappedPlayers[0]?.rank ?? 0})`);
+    console.log(
+      `[plan-builder] Mapped ${mappedPlayers.length} players. Top: ${mappedPlayers[0]?.player_name ?? "none"}`,
+    );
 
     const { data: latestRound } = await db.rpc("get_latest_completed_round");
     const roundNum = Number(latestRound ?? 0);
-
-    console.log(`[plan-builder] Latest completed round: ${roundNum}`);
 
     let proofPlayers: ProofPlayer[] = [];
     if (roundNum > 0) {
@@ -522,7 +556,7 @@ Deno.serve(async (req: Request) => {
         .limit(30);
 
       proofPlayers = (proofRaw ?? [])
-        .map((p) => ({
+        .map(p => ({
           player_id: Number(p.player_id),
           player_name: p.player_name ?? "",
           team: p.team ?? "",
@@ -530,22 +564,21 @@ Deno.serve(async (req: Request) => {
           projection_final: Number(p.projection_final),
           accuracy_gap: Math.abs(Number(p.fantasy_score) - Number(p.projection_final)),
         }))
-        .filter((p) => p.accuracy_gap <= 10)
+        .filter(p => p.accuracy_gap <= 10)
         .sort((a, b) => a.accuracy_gap - b.accuracy_gap)
         .slice(0, 5);
     }
 
-    console.log(`[plan-builder] ${mappedPlayers.length} players, ${proofPlayers.length} proof players`);
+    console.log(
+      `[plan-builder] ${mappedPlayers.length} players, ${proofPlayers.length} proof players, round ${roundNum}`,
+    );
 
-    const { data: existingPlan, error: existingPlanErr } = await db
+    // ── Plan upsert ──────────────────────────────────────────────────────────
+    const { data: existingPlan } = await db
       .from("weekly_content_plans")
       .select("id")
       .eq("week_key", weekKey)
       .maybeSingle();
-
-    if (existingPlanErr) {
-      console.error("[plan-builder] Existing plan check error:", existingPlanErr.message);
-    }
 
     let planId: string;
 
@@ -555,14 +588,12 @@ Deno.serve(async (req: Request) => {
         .from("weekly_content_plans")
         .update({ updated_at: new Date().toISOString(), focus_player_id: focusPlayerId })
         .eq("id", planId);
-
       await db
         .from("weekly_content_posts")
         .delete()
         .eq("weekly_plan_id", planId)
         .eq("locked", false);
-
-      console.log(`[plan-builder] Updated existing plan ${planId}, cleared non-locked posts`);
+      console.log(`[plan-builder] Cleared non-locked posts for plan ${planId}`);
     } else {
       const { data: newPlan, error: planInsertError } = await db
         .from("weekly_content_plans")
@@ -578,13 +609,13 @@ Deno.serve(async (req: Request) => {
         .single();
 
       if (planInsertError || !newPlan?.id) {
-        console.error("[plan-builder] Plan insert error:", planInsertError?.message);
         throw new Error(`Failed to create plan: ${planInsertError?.message}`);
       }
       planId = newPlan.id;
       console.log(`[plan-builder] Created new plan ${planId}`);
     }
 
+    // ── Build 21 posts ───────────────────────────────────────────────────────
     const usedPlayerIds = new Set<number>();
     const postsToInsert: object[] = [];
 
@@ -614,9 +645,34 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    const { error: insertError } = await db
-      .from("weekly_content_posts")
-      .insert(postsToInsert);
+    // ── 21-post guarantee ────────────────────────────────────────────────────
+    const expectedTotal = 21;
+    if (postsToInsert.length < expectedTotal) {
+      const missing = expectedTotal - postsToInsert.length;
+      console.warn(`[plan-builder] Only ${postsToInsert.length} posts built, filling ${missing} gaps`);
+      const fillPlayer = mappedPlayers[0];
+      for (let i = 0; i < missing; i++) {
+        postsToInsert.push({
+          weekly_plan_id: planId,
+          day_key: "sunday",
+          slot_key: `fill-${i}`,
+          day_number: 6,
+          slot_number: 3 + i,
+          player_id: fillPlayer?.player_id ?? null,
+          player_name: fillPlayer?.player_name ?? "TBD",
+          player2_id: null,
+          player2_name: null,
+          team: fillPlayer?.team ?? "TBD",
+          category: "Value",
+          content_type: "Graphic Post",
+          angle: "hidden_edge",
+          status: "pending",
+          locked: false,
+        });
+      }
+    }
+
+    const { error: insertError } = await db.from("weekly_content_posts").insert(postsToInsert);
 
     if (insertError) {
       console.error("[plan-builder] Post insert error:", insertError.message);
@@ -644,8 +700,6 @@ Deno.serve(async (req: Request) => {
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     console.error("[plan-builder] Fatal error:", msg);
-    // Return 200 with error payload so the frontend receives a parseable response
-    // rather than a network-level failure
     return new Response(
       JSON.stringify({ error: msg }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
