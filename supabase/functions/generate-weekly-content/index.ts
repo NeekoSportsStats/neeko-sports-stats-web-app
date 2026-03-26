@@ -199,12 +199,15 @@ function selectTop3Players(
     return b.value_score - a.value_score;
   });
 
+  // Shuffle top 15 so Top3 varies each rebuild while still being quality picks
+  const candidatePool = shuffleTopN(sorted, 15);
+
   const picked: PlayerData[] = [];
   const usedPositions = new Set<string>();
   const usedTeams = new Set<string>();
 
-  // Pass 1: unique position + unique team
-  for (const p of sorted) {
+  // Pass 1: unique position + unique team from shuffled candidate pool
+  for (const p of candidatePool) {
     if (picked.length >= 3) break;
     if (!usedPositions.has(p.position) && !usedTeams.has(p.team)) {
       picked.push(p);
@@ -215,7 +218,7 @@ function selectTop3Players(
 
   // Pass 2: allow duplicate position, still avoid same team
   if (picked.length < 3) {
-    for (const p of sorted) {
+    for (const p of candidatePool) {
       if (picked.length >= 3) break;
       if (picked.some(x => x.player_id === p.player_id)) continue;
       if (!usedTeams.has(p.team)) {
@@ -225,9 +228,9 @@ function selectTop3Players(
     }
   }
 
-  // Pass 3: fill from best remaining
+  // Pass 3: fill from remaining candidates
   if (picked.length < 3) {
-    for (const p of sorted) {
+    for (const p of candidatePool) {
       if (picked.length >= 3) break;
       if (picked.some(x => x.player_id === p.player_id)) continue;
       picked.push(p);
@@ -259,6 +262,21 @@ type PostSelection = {
 
 function pickFresh(pool: PlayerData[], usedIds: Set<number>): PlayerData | undefined {
   return pool.find(p => !usedIds.has(p.player_id));
+}
+
+function pickRandom(pool: PlayerData[], windowSize = 10): PlayerData | undefined {
+  if (pool.length === 0) return undefined;
+  const window = pool.slice(0, Math.min(windowSize, pool.length));
+  return window[Math.floor(Math.random() * window.length)];
+}
+
+function shuffleTopN<T>(arr: T[], n: number): T[] {
+  const top = arr.slice(0, Math.min(n, arr.length));
+  for (let i = top.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [top[i], top[j]] = [top[j], top[i]];
+  }
+  return top;
 }
 
 // ── WEEK PLAN BUILDER ─────────────────────────────────────────────────────────
@@ -314,7 +332,6 @@ function buildWeekPlan(
     cat: Category,
     dayUsedIds: Set<number>,
   ): { player: PlayerData | undefined; top3Players: Top3Player[] | null } {
-    // Filter available to also exclude day-level used
     const dayAvailable = () => players.filter(p => !globalUsedIds.has(p.player_id) && !dayUsedIds.has(p.player_id));
 
     if (cat === "Top3") {
@@ -327,7 +344,7 @@ function buildWeekPlan(
         p => !globalUsedIds.has(p.player_id) && !dayUsedIds.has(p.player_id),
       );
       if (proofAvail.length > 0) {
-        const pp = proofAvail[0];
+        const pp = proofAvail[Math.floor(Math.random() * proofAvail.length)];
         const found = players.find(p => p.player_id === pp.player_id);
         if (found) return { player: found, top3Players: null };
         const synthetic: PlayerData = {
@@ -355,19 +372,19 @@ function buildWeekPlan(
           recommendation_short: "Good pick",
           market_watch_category: "Value",
           games_played: 10,
+          player_status: "",
         };
         return { player: synthetic, top3Players: null };
       }
-      const rankPool = dayAvailable().sort((a, b) => b.rank - a.rank);
-      return { player: rankPool[0], top3Players: null };
+      return { player: pickRandom(dayAvailable().sort((a, b) => b.rank - a.rank), 15), top3Players: null };
     }
 
     if (cat === "Value") {
       const valuePool = dayAvailable()
         .filter(p => p.value_score >= VALUE_MIN_VALUE_SCORE && p.risk_rating <= VALUE_MAX_BUST_RISK)
         .sort((a, b) => b.value_score - a.value_score);
-      const rankPool = dayAvailable().sort((a, b) => b.rank - a.rank);
-      return { player: valuePool[0] ?? rankPool[0], top3Players: null };
+      if (valuePool.length > 0) return { player: pickRandom(valuePool, 25), top3Players: null };
+      return { player: pickRandom(dayAvailable().sort((a, b) => b.rank - a.rank), 15), top3Players: null };
     }
 
     if (cat === "Breakout") {
@@ -377,33 +394,31 @@ function buildWeekPlan(
           p.value_score >= VALUE_MIN_VALUE_SCORE,
         )
         .sort((a, b) => b.upside_pct - a.upside_pct);
-      const rankPool = dayAvailable().sort((a, b) => b.rank - a.rank);
-      return { player: boPool[0] ?? rankPool[0], top3Players: null };
+      if (boPool.length > 0) return { player: pickRandom(boPool, 25), top3Players: null };
+      return { player: pickRandom(dayAvailable().sort((a, b) => b.rank - a.rank), 15), top3Players: null };
     }
 
     if (cat === "Trap") {
       const trapPool = dayAvailable()
         .filter(p => p.value_score <= TRAP_MAX_VALUE_SCORE && p.risk_rating >= TRAP_MIN_BUST_RISK)
         .sort((a, b) => b.risk_rating - a.risk_rating);
-      const rankPool = dayAvailable().sort((a, b) => b.rank - a.rank);
-      return { player: trapPool[0] ?? rankPool[0], top3Players: null };
+      if (trapPool.length > 0) return { player: pickRandom(trapPool, 25), top3Players: null };
+      return { player: pickRandom(dayAvailable().sort((a, b) => b.rank - a.rank), 15), top3Players: null };
     }
 
     if (cat === "Engagement" || cat === "Conversation") {
-      const rankPool = dayAvailable().sort((a, b) => b.rank - a.rank);
-      return { player: rankPool[0], top3Players: null };
+      return { player: pickRandom(dayAvailable().sort((a, b) => b.rank - a.rank), 20), top3Players: null };
     }
 
     if (cat === "Injury") {
       const injuredPool = dayAvailable()
         .filter(p => p.player_status === "INJURED")
         .sort((a, b) => b.rank - a.rank);
-      if (injuredPool.length > 0) return { player: injuredPool[0], top3Players: null };
+      if (injuredPool.length > 0) return { player: pickRandom(injuredPool, injuredPool.length), top3Players: null };
       return { player: undefined, top3Players: null };
     }
 
-    const rankPool = dayAvailable().sort((a, b) => b.rank - a.rank);
-    return { player: rankPool[0], top3Players: null };
+    return { player: pickRandom(dayAvailable().sort((a, b) => b.rank - a.rank), 15), top3Players: null };
   }
 
   for (let dayIndex = 0; dayIndex < 7; dayIndex++) {
