@@ -385,11 +385,12 @@ function buildWeekPlan(
       const proofAvail = proofPlayers.filter(
         p => !globalUsedIds.has(p.player_id) && !dayUsedIds.has(p.player_id),
       );
+      console.log(`[select] Proof pool_size=${proofAvail.length}`);
       if (proofAvail.length > 0) {
         const pp = proofAvail[Math.floor(Math.random() * proofAvail.length)];
         const found = safePlayers.find(p => p.player_id === pp.player_id);
         if (found) {
-          console.log(`[select] Proof → ${found.player_name} (accuracy_gap=${pp.accuracy_gap})`);
+          console.log(`[select] Proof → ${found.player_name} (accuracy_gap=${pp.accuracy_gap}) fallback_used=false`);
           return { player: found, top3Players: null, reason: `proof: accuracy_gap=${pp.accuracy_gap}` };
         }
         const synthetic: PlayerData = {
@@ -421,12 +422,31 @@ function buildWeekPlan(
           is_bye: false,
           played_last_game: true,
         };
-        console.log(`[select] Proof synthetic → ${pp.player_name}`);
+        console.log(`[select] Proof synthetic → ${pp.player_name} fallback_used=false`);
         return { player: synthetic, top3Players: null, reason: "proof synthetic" };
       }
+      // Fallback 1: highest consistency players (proof via form stability)
+      const consistencyPool = pool
+        .filter(p => p.consistency >= 65)
+        .sort((a, b) => b.consistency - a.consistency);
+      if (consistencyPool.length > 0) {
+        const pick = pickRandom(consistencyPool, 15);
+        console.warn(`[select] Proof fallback_used=true — no proof data, using high-consistency player → ${pick?.player_name}`);
+        return { player: pick, top3Players: null, reason: "proof fallback: high consistency" };
+      }
+      // Fallback 2: highest form_score players
+      const formPool = pool
+        .filter(p => p.form_score >= 60)
+        .sort((a, b) => b.form_score - a.form_score);
+      if (formPool.length > 0) {
+        const pick = pickRandom(formPool, 15);
+        console.warn(`[select] Proof fallback_used=true — using high-form player → ${pick?.player_name}`);
+        return { player: pick, top3Players: null, reason: "proof fallback: high form" };
+      }
+      // Fallback 3: top-ranked active player
       const fallback = pickRandom(pool.sort((a, b) => b.rank - a.rank), 15);
-      console.log(`[select] Proof fallback → ${fallback?.player_name ?? "none"}`);
-      return { player: fallback, top3Players: null, reason: "proof fallback (no accuracy data)" };
+      console.warn(`[select] Proof fallback_used=true — using rank fallback → ${fallback?.player_name ?? "none"}`);
+      return { player: fallback, top3Players: null, reason: "proof fallback: rank" };
     }
 
     // SECTION 5: Category-specific pool logic
@@ -447,25 +467,46 @@ function buildWeekPlan(
     }
 
     if (cat === "Breakout") {
-      const boPool = pool
+      // Primary: strict upside + form + value + rank
+      const boPoolPrimary = pool
         .filter(p =>
           (p.upside_pct >= BREAKOUT_MIN_UPSIDE || p.form_score >= BREAKOUT_MIN_FORM) &&
           p.value_score >= VALUE_MIN_VALUE_SCORE &&
           p.rank <= 100,
         )
         .sort((a, b) => b.upside_pct - a.upside_pct);
-      if (boPool.length > 0) {
-        const pick = pickFromTiers(boPool);
-        console.log(`[select] Breakout → ${pick?.player_name} (upside=${pick?.upside_pct})`);
+      console.log(`[select] Breakout pool_size=${boPoolPrimary.length}`);
+      if (boPoolPrimary.length > 0) {
+        const pick = pickFromTiers(boPoolPrimary);
+        console.log(`[select] Breakout → ${pick?.player_name} (upside=${pick?.upside_pct}) fallback_used=false`);
         return { player: pick, top3Players: null, reason: `breakout: upside=${pick?.upside_pct}` };
       }
+      // Fallback 1: relax rank constraint, keep upside/form
+      const boFallback1 = pool
+        .filter(p => p.upside_pct >= BREAKOUT_MIN_UPSIDE || p.form_score >= BREAKOUT_MIN_FORM)
+        .sort((a, b) => b.upside_pct - a.upside_pct);
+      if (boFallback1.length > 0) {
+        const pick = pickFromTiers(boFallback1);
+        console.warn(`[select] Breakout fallback_used=true — relaxed rank → ${pick?.player_name}`);
+        return { player: pick, top3Players: null, reason: "breakout fallback: relaxed rank" };
+      }
+      // Fallback 2: mid-tier players trending upward (positive price change or signal)
+      const boFallback2 = pool
+        .filter(p => p.price_change > 0 || p.signal === "rising")
+        .sort((a, b) => b.price_change - a.price_change);
+      if (boFallback2.length > 0) {
+        const pick = pickFromTiers(boFallback2);
+        console.warn(`[select] Breakout fallback_used=true — trending upward → ${pick?.player_name}`);
+        return { player: pick, top3Players: null, reason: "breakout fallback: trending up" };
+      }
+      // Fallback 3: rank-ordered active player
       const fallback = pickFromTiers(pool.sort((a, b) => b.rank - a.rank));
-      console.log(`[select] Breakout fallback → ${fallback?.player_name ?? "none"}`);
-      return { player: fallback, top3Players: null, reason: "breakout fallback" };
+      console.warn(`[select] Breakout fallback_used=true — rank fallback → ${fallback?.player_name ?? "none"}`);
+      return { player: fallback, top3Players: null, reason: "breakout fallback: rank" };
     }
 
     if (cat === "Trap") {
-      // Must have high bust risk AND meaningful price (not cheap rookies)
+      // Primary: high bust risk + meaningful price
       const trapPool = pool
         .filter(p =>
           p.value_score <= TRAP_MAX_VALUE_SCORE &&
@@ -473,17 +514,34 @@ function buildWeekPlan(
           p.price >= 400000,
         )
         .sort((a, b) => b.risk_rating - a.risk_rating);
+      console.log(`[select] Trap pool_size=${trapPool.length}`);
       if (trapPool.length > 0) {
         const pick = pickRandom(trapPool, 25);
-        console.log(`[select] Trap → ${pick?.player_name} (risk=${pick?.risk_rating}, price=${pick?.price})`);
+        console.log(`[select] Trap → ${pick?.player_name} (risk=${pick?.risk_rating}, price=${pick?.price}) fallback_used=false`);
         return { player: pick, top3Players: null, reason: `trap: risk=${pick?.risk_rating}` };
       }
-      const fallback = pickRandom(
-        pool.filter(p => p.risk_rating >= 5).sort((a, b) => b.risk_rating - a.risk_rating),
-        15,
-      );
-      console.log(`[select] Trap fallback → ${fallback?.player_name ?? "none"}`);
-      return { player: fallback, top3Players: null, reason: "trap fallback" };
+      // Fallback 1: relax price constraint
+      const trapFallback1 = pool
+        .filter(p => p.risk_rating >= TRAP_MIN_BUST_RISK)
+        .sort((a, b) => b.risk_rating - a.risk_rating);
+      if (trapFallback1.length > 0) {
+        const pick = pickRandom(trapFallback1, 15);
+        console.warn(`[select] Trap fallback_used=true — relaxed price → ${pick?.player_name}`);
+        return { player: pick, top3Players: null, reason: "trap fallback: relaxed price" };
+      }
+      // Fallback 2: any player with elevated risk (>= 5)
+      const trapFallback2 = pool
+        .filter(p => p.risk_rating >= 5)
+        .sort((a, b) => b.risk_rating - a.risk_rating);
+      if (trapFallback2.length > 0) {
+        const pick = pickRandom(trapFallback2, 15);
+        console.warn(`[select] Trap fallback_used=true — risk>=5 → ${pick?.player_name}`);
+        return { player: pick, top3Players: null, reason: "trap fallback: risk>=5" };
+      }
+      // Fallback 3: rank-ordered active player
+      const fallback = pickFromTiers(pool.sort((a, b) => b.rank - a.rank));
+      console.warn(`[select] Trap fallback_used=true — rank fallback → ${fallback?.player_name ?? "none"}`);
+      return { player: fallback, top3Players: null, reason: "trap fallback: rank" };
     }
 
     if (cat === "Engagement" || cat === "Conversation") {
@@ -616,10 +674,33 @@ function buildWeekPlan(
       const resolvedPlayerName = primary?.player_name ?? player?.player_name ?? null;
       const resolvedTeam = primary?.team ?? player?.team ?? "";
 
-      // SECTION 5 & 7: Validate player before creating post — never allow null player for non-Top3
+      // SECTION 5 & 7: Validate player before creating post — never allow null for non-Top3
       if (cat !== "Top3" && (!resolvedPlayerId || !resolvedPlayerName)) {
-        console.error(`[build] INVALID POST — ${config.display} slot ${idx + 1} (${cat}): missing player. player_id=${resolvedPlayerId}, player_name=${resolvedPlayerName}`);
-        throw new Error(`Invalid post — missing player for ${cat} on ${config.display} slot ${idx + 1}`);
+        console.warn(`[build] fallback_used=true — missing player for ${cat} on ${config.display} slot ${idx + 1}. Applying global emergency fallback.`);
+        const emergency = safePlayers.sort((a, b) => b.rank - a.rank)[0];
+        if (!emergency) {
+          console.error(`[build] FATAL — no active players available for emergency fallback`);
+        } else {
+          console.warn(`[build] Emergency fallback → ${emergency.player_name} (player_id=${emergency.player_id})`);
+          (resolvedPlayerId as unknown as number) || (player = emergency);
+          const safeId = emergency.player_id;
+          const safeName = emergency.player_name;
+          const safeTeam = emergency.team;
+          dayResults[idx] = {
+            player_id: safeId,
+            player_name: safeName,
+            team: safeTeam,
+            category: cat,
+            angle,
+            content_type,
+            player2_id: null,
+            player2_name: null,
+            top3_players: null,
+          };
+          console.log(`[build] Selected player:`, { category: cat, player_id: safeId, player_name: safeName, reason: "global emergency fallback" });
+          console.log(`[build] ${config.display} slot ${idx + 1}: ${cat} → ${safeName} [global emergency fallback]`);
+          continue;
+        }
       }
 
       // SECTION 7: Logging
@@ -1086,16 +1167,16 @@ Deno.serve(async (req: Request) => {
       const slot = (idx % 3) + 1;
       const config = DAY_CONFIGS[dayIndex] ?? DAY_CONFIGS[6];
 
-      // SECTION 5: Hard guard — never insert a post without player for non-Top3
+      // SECTION 5: Hard guard — skip posts missing player for non-Top3, never throw
       if (post.category !== "Top3" && (!post.player_id || !post.player_name)) {
-        console.error("[plan-builder] Invalid post — missing player", {
+        console.warn("[plan-builder] fallback_used=true — skipping post with missing player", {
           category: post.category,
           player_id: post.player_id,
           player_name: post.player_name,
           day: config.label,
           slot,
         });
-        throw new Error(`Invalid post — missing player for ${post.category} on ${config.label} slot ${slot}`);
+        return null;
       }
 
       return {
@@ -1118,7 +1199,9 @@ Deno.serve(async (req: Request) => {
       };
     });
 
-    const { error: insertError } = await db.from("weekly_content_posts").insert(postsToInsert);
+    const validPostsToInsert = postsToInsert.filter(p => p !== null);
+    console.log(`[plan-builder] Inserting ${validPostsToInsert.length} valid posts (${postsToInsert.length - validPostsToInsert.length} skipped)`);
+    const { error: insertError } = await db.from("weekly_content_posts").insert(validPostsToInsert);
 
     if (insertError) {
       console.error("[plan-builder] Post insert error:", insertError.message);
