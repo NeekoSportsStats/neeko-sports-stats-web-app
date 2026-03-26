@@ -1167,51 +1167,75 @@ Deno.serve(async (req: Request) => {
     }
     console.log("[plan-builder] Final category distribution:", JSON.stringify(catCounts));
 
-    const postsToInsert = weekPosts.map((post, idx) => {
+    let insertedCount = 0;
+    let skippedCount = 0;
+
+    for (let idx = 0; idx < weekPosts.length; idx++) {
+      const post = weekPosts[idx];
       const dayIndex = Math.floor(idx / 3);
       const slot = (idx % 3) + 1;
       const config = DAY_CONFIGS[dayIndex] ?? DAY_CONFIGS[6];
 
-      // SECTION 5: Hard guard — skip posts missing player for non-Top3, never throw
-      if (post.category !== "Top3" && (!post.player_id || !post.player_name)) {
-        console.warn("[plan-builder] fallback_used=true — skipping post with missing player", {
-          category: post.category,
-          player_id: post.player_id,
-          player_name: post.player_name,
-          day: config.label,
-          slot,
-        });
-        return null;
+      // For Top3: player_id and player_name MUST come from top3Players[0]
+      let resolvedPlayerId = post.player_id;
+      let resolvedPlayerName = post.player_name;
+      let resolvedTeam = post.team;
+
+      if (post.category === "Top3" && Array.isArray(post.top3_players) && post.top3_players.length >= 3) {
+        const anchor = post.top3_players[0];
+        resolvedPlayerId = anchor.player_id ?? resolvedPlayerId;
+        resolvedPlayerName = anchor.player_name ?? resolvedPlayerName;
+        resolvedTeam = anchor.team ?? resolvedTeam;
+        console.log(`[plan-builder] Top3 anchor → ${resolvedPlayerName} (${resolvedPlayerId})`);
       }
 
-      return {
+      // Hard validation: skip any post still missing player_id or player_name
+      if (!resolvedPlayerId || !resolvedPlayerName) {
+        console.warn(`[plan-builder] Skipping post — null player`, {
+          category: post.category,
+          day: config.label,
+          slot,
+          player_id: resolvedPlayerId,
+          player_name: resolvedPlayerName,
+        });
+        skippedCount++;
+        continue;
+      }
+
+      const row = {
         weekly_plan_id: planId,
         day_key: config.label,
         slot_key: String(slot),
         day_number: dayIndex,
         slot_number: slot,
-        player_id: post.player_id || null,
-        player_name: post.player_name || null,
+        player_id: resolvedPlayerId,
+        player_name: resolvedPlayerName,
         player2_id: post.player2_id,
         player2_name: post.player2_name,
         top3_players: post.top3_players ?? null,
-        team: post.team || null,
+        team: resolvedTeam || null,
         category: post.category,
         content_type: post.content_type,
         angle: post.angle,
         status: "pending",
         locked: false,
       };
-    });
 
-    const validPostsToInsert = postsToInsert.filter(p => p !== null);
-    console.log(`[plan-builder] Inserting ${validPostsToInsert.length} valid posts (${postsToInsert.length - validPostsToInsert.length} skipped)`);
-    const { error: insertError } = await db.from("weekly_content_posts").insert(validPostsToInsert);
-
-    if (insertError) {
-      console.error("[plan-builder] Post insert error:", insertError.message);
-      throw new Error(`Failed to insert posts: ${insertError.message}`);
+      try {
+        const { error: insertError } = await db.from("weekly_content_posts").insert(row);
+        if (insertError) {
+          console.error(`[plan-builder] Insert failed for ${config.label} slot ${slot} (${post.category}):`, insertError.message);
+          skippedCount++;
+        } else {
+          insertedCount++;
+        }
+      } catch (e) {
+        console.error(`[plan-builder] Insert exception for ${config.label} slot ${slot}:`, e instanceof Error ? e.message : String(e));
+        skippedCount++;
+      }
     }
+
+    console.log(`[plan-builder] Inserted ${insertedCount} posts, skipped ${skippedCount}`);
 
     const usageRows = weekPosts
       .filter(p => p.player_id && p.player_id > 0)
