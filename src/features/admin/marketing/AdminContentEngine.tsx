@@ -1314,11 +1314,12 @@ export default function AdminContentEngine() {
 
   function getCurrentWeekKey(): string {
     const now = new Date();
-    const day = now.getDay();
-    const diff = now.getDate() - day + (day === 0 ? -6 : 1);
-    const mon = new Date(now);
-    mon.setDate(diff);
-    return mon.toISOString().slice(0, 10);
+    const year = now.getFullYear();
+    const startOfYear = new Date(year, 0, 1);
+    const week = Math.ceil(
+      ((now.getTime() - startOfYear.getTime()) / 86400000 + startOfYear.getDay() + 1) / 7
+    );
+    return `${year}-W${String(week).padStart(2, "0")}`;
   }
 
   const loadExistingPlan = useCallback(async () => {
