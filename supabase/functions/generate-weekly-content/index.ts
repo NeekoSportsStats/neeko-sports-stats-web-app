@@ -284,6 +284,7 @@ function shuffleTopN<T>(arr: T[], n: number): T[] {
 function buildWeekPlan(
   players: PlayerData[],
   proofPlayers: ProofPlayer[],
+  injuredPlayers: PlayerData[] = [],
 ): PostSelection[] {
   const weekCounts: Record<string, number> = {};
   const globalUsedIds = new Set<number>();
@@ -411,8 +412,10 @@ function buildWeekPlan(
     }
 
     if (cat === "Injury") {
-      const injuredPool = dayAvailable()
-        .filter(p => p.player_status === "INJURED")
+      // Use the dedicated injured pool (is_available=false, status=OUT)
+      // These players are NOT in the main active pool so no global dedup needed
+      const injuredPool = injuredPlayers
+        .filter(p => !dayUsedIds.has(p.player_id))
         .sort((a, b) => b.rank - a.rank);
       if (injuredPool.length > 0) return { player: pickRandom(injuredPool, injuredPool.length), top3Players: null };
       return { player: undefined, top3Players: null };
@@ -735,6 +738,8 @@ Deno.serve(async (req: Request) => {
       db: { schema: "afl" },
     });
 
+    // Fetch a large active player pool — randomise offset to ensure variety across rebuilds
+    const randomOffset = Math.floor(Math.random() * 30);
     const { data: rawPlayers, error: playersError } = await aflDb
       .from("player_rankings_cache")
       .select(`
@@ -750,18 +755,37 @@ Deno.serve(async (req: Request) => {
       .not("projection_final", "is", null)
       .not("manual_status", "in", '("RETIRED","DELISTED","BYE")')
       .order("neeko_rating_scaled", { ascending: false })
-      .limit(80);
+      .limit(150);
+
+    // Separately fetch injured players (is_available=false, status=OUT, not bye/retired)
+    const { data: rawInjured } = await aflDb
+      .from("player_rankings_cache")
+      .select(`
+        player_id, player_name, team, position,
+        projection_final, ceiling, floor, price, prev_price, price_change,
+        value_score, best_value_score, neeko_rating_scaled, form_score, consistency,
+        captain_score, risk_rating, upside_pct, matchup_label, signal,
+        ai_recommendation, recommendation_short, market_watch_category, games_played,
+        is_bye, manual_status, status
+      `)
+      .eq("is_available", false)
+      .eq("is_bye", false)
+      .eq("status", "OUT")
+      .not("manual_status", "in", '("RETIRED","DELISTED","BYE")')
+      .not("projection_final", "is", null)
+      .order("neeko_rating_scaled", { ascending: false })
+      .limit(30);
 
     if (playersError) {
       console.error("[plan-builder] Player fetch error:", playersError.message);
       throw new Error(`Player fetch failed: ${playersError.message}`);
     }
 
-    const mappedPlayers: PlayerData[] = (rawPlayers ?? []).map(p => ({
-      player_id: p.player_id,
-      player_name: p.player_name ?? "Unknown",
-      team: p.team ?? "Unknown",
-      position: p.position ?? "MID",
+    const mapPlayer = (p: Record<string, unknown>): PlayerData => ({
+      player_id: p.player_id as number,
+      player_name: (p.player_name as string) ?? "Unknown",
+      team: (p.team as string) ?? "Unknown",
+      position: (p.position as string) ?? "MID",
       projection: Number(p.projection_final ?? 0),
       ceiling: Number(p.ceiling ?? 0),
       floor: Number(p.floor ?? 0),
@@ -776,17 +800,39 @@ Deno.serve(async (req: Request) => {
       captain_score: Number(p.captain_score ?? 0),
       risk_rating: Number(p.risk_rating ?? 5),
       upside_pct: Number(p.upside_pct ?? 0),
-      matchup_label: p.matchup_label ?? "",
-      signal: p.signal ?? "",
-      ai_recommendation: p.ai_recommendation ?? "",
-      recommendation_short: p.recommendation_short ?? "",
-      market_watch_category: p.market_watch_category ?? "",
+      matchup_label: (p.matchup_label as string) ?? "",
+      signal: (p.signal as string) ?? "",
+      ai_recommendation: (p.ai_recommendation as string) ?? "",
+      recommendation_short: (p.recommendation_short as string) ?? "",
+      market_watch_category: (p.market_watch_category as string) ?? "",
       games_played: Number(p.games_played ?? 0),
-      player_status: p.status ?? "",
-    }));
+      player_status: (p.status as string) ?? "",
+    });
+
+    // Shuffle the full active pool so the same top-N aren't always selected
+    const shuffledActive = shuffleTopN(rawPlayers ?? [], (rawPlayers ?? []).length);
+    const mappedPlayers: PlayerData[] = shuffledActive.map(p => mapPlayer(p as Record<string, unknown>));
+
+    // Merge injured players into the pool (they're eligible only for Injury category posts)
+    const mappedInjured: PlayerData[] = (rawInjured ?? []).map(p => mapPlayer(p as Record<string, unknown>));
+    const allPlayers: PlayerData[] = [...mappedPlayers, ...mappedInjured];
+
+    // Load recently used player IDs (past 3 days) to avoid repeats across rebuilds
+    const threeDaysAgo = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString();
+    const { data: recentUsage } = await db
+      .from("content_player_usage")
+      .select("player_id")
+      .gte("used_at", threeDaysAgo);
+    const recentlyUsedIds = new Set<number>((recentUsage ?? []).map((r: { player_id: number }) => r.player_id));
+
+    // Filter recently used from the active pool (but keep injured players available)
+    const freshPlayers = mappedPlayers.filter(p => !recentlyUsedIds.has(p.player_id));
+    // Fall back to full pool if too few fresh players remain
+    const selectionPool = freshPlayers.length >= 30 ? freshPlayers : mappedPlayers;
 
     console.log(
-      `[plan-builder] Mapped ${mappedPlayers.length} players. Top: ${mappedPlayers[0]?.player_name ?? "none"}`,
+      `[plan-builder] ${mappedPlayers.length} active + ${mappedInjured.length} injured players. ` +
+      `Fresh (not used in 3d): ${freshPlayers.length}. Using pool of ${selectionPool.length}.`,
     );
 
     const lastRoundResult = await db.rpc("get_latest_completed_round");
@@ -825,7 +871,7 @@ Deno.serve(async (req: Request) => {
     }
 
     console.log(
-      `[plan-builder] ${mappedPlayers.length} players, ${proofPlayers.length} proof players, round ${roundNum}`,
+      `[plan-builder] ${selectionPool.length} selection pool, ${mappedInjured.length} injured, ${proofPlayers.length} proof players, round ${roundNum}`,
     );
 
     const { data: existingPlan } = await db
@@ -870,7 +916,9 @@ Deno.serve(async (req: Request) => {
     }
 
     // ── Build the week plan with all constraints ───────────────────────────────
-    const weekPosts = buildWeekPlan(mappedPlayers, proofPlayers);
+    // selectionPool = fresh active players (not used in 3d, or full pool if too few)
+    // allPlayers = active + injured (injured only used for Injury category)
+    const weekPosts = buildWeekPlan(selectionPool, proofPlayers, mappedInjured);
 
     // Log category distribution for debugging
     const catCounts: Record<string, number> = {};
@@ -908,6 +956,27 @@ Deno.serve(async (req: Request) => {
     if (insertError) {
       console.error("[plan-builder] Post insert error:", insertError.message);
       throw new Error(`Failed to insert posts: ${insertError.message}`);
+    }
+
+    // Persist usage records so these players are skipped on the next rebuild
+    const usageRows = weekPosts
+      .filter(p => p.player_id && p.player_id > 0)
+      .map((post, idx) => {
+        const dayIndex = Math.floor(idx / 3);
+        const config = DAY_CONFIGS[dayIndex] ?? DAY_CONFIGS[6];
+        return {
+          player_id: post.player_id,
+          player_name: post.player_name,
+          category: post.category,
+          week_key: weekKey,
+          day_key: config.label,
+          used_at: new Date().toISOString(),
+        };
+      });
+
+    if (usageRows.length > 0) {
+      await db.from("content_player_usage").insert(usageRows);
+      console.log(`[plan-builder] Recorded ${usageRows.length} usage entries`);
     }
 
     await db
