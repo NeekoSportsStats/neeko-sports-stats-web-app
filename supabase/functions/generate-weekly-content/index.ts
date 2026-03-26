@@ -33,6 +33,8 @@ interface PlayerData {
   market_watch_category: string;
   games_played: number;
   player_status: string;
+  is_bye: boolean;
+  played_last_game: boolean;
 }
 
 interface Top3Player {
@@ -61,10 +63,6 @@ const WEEKLY_CAPS: Record<string, number> = {
   Value: 5,
   Trap: 4,
   Breakout: 4,
-};
-
-const WEEKLY_MINIMUMS: Record<string, number> = {
-  Proof: 2,
 };
 
 // ── WEEKLY TEMPLATE (LOCKED) ───────────────────────────────────────────────────
@@ -134,7 +132,6 @@ const DAY_CONFIGS: DayConfig[] = [
   {
     label: "saturday",
     display: "Saturday",
-    // Saturday slot 0: Top3 optional — resolved at runtime
     categories: ["Top3", "Breakout", "Engagement"],
     angles: ["top3_saturday", "market_inefficiency", "conversation"],
     content_types: ["Top 3 Post", "Short-form Video", "Conversation Post"],
@@ -168,6 +165,24 @@ const TRAP_MIN_BUST_RISK = 6;
 const BREAKOUT_MIN_UPSIDE = 8;
 const BREAKOUT_MIN_FORM = 55;
 
+// ── HARD BYE GUARD ─────────────────────────────────────────────────────────────
+// Applied at every layer as a final safeguard
+function isValidPlayer(p: PlayerData): boolean {
+  if (p.is_bye) return false;
+  if (p.player_status === "RETIRED" || p.player_status === "DELISTED") return false;
+  return true;
+}
+
+function hardFilter(players: PlayerData[]): PlayerData[] {
+  const before = players.length;
+  const filtered = players.filter(isValidPlayer);
+  const removed = before - filtered.length;
+  if (removed > 0) {
+    console.log(`[hard-filter] Removed ${removed} BYE/RETIRED/DELISTED players`);
+  }
+  return filtered;
+}
+
 function getWeekKey(): string {
   const now = new Date();
   const year = now.getFullYear();
@@ -186,27 +201,64 @@ function getWeekStartDate(): string {
   return monday.toISOString().split("T")[0];
 }
 
+// ── TIER-BASED RANDOM SELECTION ───────────────────────────────────────────────
+// Splits pool into 3 tiers and randomly picks a tier first for variety
+function pickFromTiers(pool: PlayerData[]): PlayerData | undefined {
+  if (pool.length === 0) return undefined;
+
+  const tier1 = pool.slice(0, Math.min(30, pool.length));
+  const tier2 = pool.slice(30, Math.min(80, pool.length));
+  const tier3 = pool.slice(80, Math.min(150, pool.length));
+
+  const rand = Math.random();
+  let selectedTier: PlayerData[];
+
+  if (rand < 0.50 || tier2.length === 0) {
+    selectedTier = tier1;
+  } else if (rand < 0.80 || tier3.length === 0) {
+    selectedTier = tier2.length > 0 ? tier2 : tier1;
+  } else {
+    selectedTier = tier3.length > 0 ? tier3 : (tier2.length > 0 ? tier2 : tier1);
+  }
+
+  const pick = selectedTier[Math.floor(Math.random() * selectedTier.length)];
+  console.log(`[tier-pick] tier=${rand < 0.50 ? "1(1-30)" : rand < 0.80 ? "2(31-80)" : "3(81-150)"} → ${pick?.player_name} (${pick?.team})`);
+  return pick;
+}
+
+function pickRandom(pool: PlayerData[], windowSize = 10): PlayerData | undefined {
+  if (pool.length === 0) return undefined;
+  const window = pool.slice(0, Math.min(windowSize, pool.length));
+  return window[Math.floor(Math.random() * window.length)];
+}
+
+function shuffleTopN<T>(arr: T[], n: number): T[] {
+  const top = arr.slice(0, Math.min(n, arr.length));
+  for (let i = top.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [top[i], top[j]] = [top[j], top[i]];
+  }
+  return top;
+}
+
 // ── TOP3 PLAYER SELECTION ─────────────────────────────────────────────────────
-// Picks exactly 3 players, no team repeats, diverse positions where possible.
 function selectTop3Players(
   pool: PlayerData[],
   globalUsedIds: Set<number>,
 ): Top3Player[] {
-  const available = pool.filter(p => !globalUsedIds.has(p.player_id));
+  const available = hardFilter(pool.filter(p => !globalUsedIds.has(p.player_id)));
 
   const sorted = [...available].sort((a, b) => {
     if (b.projection !== a.projection) return b.projection - a.projection;
     return b.value_score - a.value_score;
   });
 
-  // Shuffle top 15 so Top3 varies each rebuild while still being quality picks
   const candidatePool = shuffleTopN(sorted, 15);
 
   const picked: PlayerData[] = [];
   const usedPositions = new Set<string>();
   const usedTeams = new Set<string>();
 
-  // Pass 1: unique position + unique team from shuffled candidate pool
   for (const p of candidatePool) {
     if (picked.length >= 3) break;
     if (!usedPositions.has(p.position) && !usedTeams.has(p.team)) {
@@ -216,7 +268,6 @@ function selectTop3Players(
     }
   }
 
-  // Pass 2: allow duplicate position, still avoid same team
   if (picked.length < 3) {
     for (const p of candidatePool) {
       if (picked.length >= 3) break;
@@ -228,7 +279,6 @@ function selectTop3Players(
     }
   }
 
-  // Pass 3: fill from remaining candidates
   if (picked.length < 3) {
     for (const p of candidatePool) {
       if (picked.length >= 3) break;
@@ -236,6 +286,8 @@ function selectTop3Players(
       picked.push(p);
     }
   }
+
+  console.log(`[top3] Selected: ${picked.map(p => `${p.player_name}(${p.team})`).join(", ")}`);
 
   return picked.slice(0, 3).map(p => ({
     player_id: p.player_id,
@@ -260,58 +312,21 @@ type PostSelection = {
   top3_players: Top3Player[] | null;
 };
 
-function pickFresh(pool: PlayerData[], usedIds: Set<number>): PlayerData | undefined {
-  return pool.find(p => !usedIds.has(p.player_id));
-}
-
-function pickRandom(pool: PlayerData[], windowSize = 10): PlayerData | undefined {
-  if (pool.length === 0) return undefined;
-  const window = pool.slice(0, Math.min(windowSize, pool.length));
-  return window[Math.floor(Math.random() * window.length)];
-}
-
-function shuffleTopN<T>(arr: T[], n: number): T[] {
-  const top = arr.slice(0, Math.min(n, arr.length));
-  for (let i = top.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [top[i], top[j]] = [top[j], top[i]];
-  }
-  return top;
-}
-
 // ── WEEK PLAN BUILDER ─────────────────────────────────────────────────────────
-// Builds all 21 posts with hard caps, correct template, and anti-spam rules.
 function buildWeekPlan(
   players: PlayerData[],
   proofPlayers: ProofPlayer[],
   injuredPlayers: PlayerData[] = [],
 ): PostSelection[] {
+  // SECTION 1: Hard BYE filter applied before ANY selection logic
+  const safePlayers = hardFilter(players);
+  const safeInjured = injuredPlayers.filter(p => !p.is_bye && p.player_status !== "RETIRED" && p.player_status !== "DELISTED");
+
+  console.log(`[build] Starting with ${safePlayers.length} active, ${safeInjured.length} injured`);
+
   const weekCounts: Record<string, number> = {};
   const globalUsedIds = new Set<number>();
   const allPosts: PostSelection[] = [];
-
-  // Resolve Saturday Top3 slot: only include if we haven't hit cap yet
-  // Friday is day 4 (index 4) and always has Top3. Saturday is optional.
-  // We build day-by-day in order, so we track as we go.
-
-  const available = () => players.filter(p => !globalUsedIds.has(p.player_id));
-
-  const byRank = () => [...available()].sort((a, b) => b.rank - a.rank);
-  const byValue = () =>
-    [...available()]
-      .filter(p => p.value_score >= VALUE_MIN_VALUE_SCORE && p.risk_rating <= VALUE_MAX_BUST_RISK)
-      .sort((a, b) => b.value_score - a.value_score);
-  const byBreakout = () =>
-    [...available()]
-      .filter(p =>
-        (p.upside_pct >= BREAKOUT_MIN_UPSIDE || p.form_score >= BREAKOUT_MIN_FORM) &&
-        p.value_score >= VALUE_MIN_VALUE_SCORE,
-      )
-      .sort((a, b) => b.upside_pct - a.upside_pct);
-  const byTrap = () =>
-    [...available()]
-      .filter(p => p.value_score <= TRAP_MAX_VALUE_SCORE && p.risk_rating >= TRAP_MIN_BUST_RISK)
-      .sort((a, b) => b.risk_rating - a.risk_rating);
 
   function incCount(cat: string) {
     weekCounts[cat] = (weekCounts[cat] ?? 0) + 1;
@@ -329,15 +344,22 @@ function buildWeekPlan(
     return "Value";
   }
 
+  function dayAvailablePool(dayUsedIds: Set<number>): PlayerData[] {
+    return hardFilter(
+      safePlayers.filter(p => !globalUsedIds.has(p.player_id) && !dayUsedIds.has(p.player_id))
+    );
+  }
+
   function selectPlayerForCategory(
     cat: Category,
     dayUsedIds: Set<number>,
-  ): { player: PlayerData | undefined; top3Players: Top3Player[] | null } {
-    const dayAvailable = () => players.filter(p => !globalUsedIds.has(p.player_id) && !dayUsedIds.has(p.player_id));
+  ): { player: PlayerData | undefined; top3Players: Top3Player[] | null; reason: string } {
+    const pool = dayAvailablePool(dayUsedIds);
 
     if (cat === "Top3") {
-      const top3 = selectTop3Players(players, globalUsedIds);
-      return { player: players.find(p => p.player_id === top3[0]?.player_id), top3Players: top3 };
+      const top3 = selectTop3Players(safePlayers, globalUsedIds);
+      const anchor = safePlayers.find(p => p.player_id === top3[0]?.player_id);
+      return { player: anchor, top3Players: top3, reason: "top3 shuffle from top 15 by projection" };
     }
 
     if (cat === "Proof") {
@@ -346,8 +368,11 @@ function buildWeekPlan(
       );
       if (proofAvail.length > 0) {
         const pp = proofAvail[Math.floor(Math.random() * proofAvail.length)];
-        const found = players.find(p => p.player_id === pp.player_id);
-        if (found) return { player: found, top3Players: null };
+        const found = safePlayers.find(p => p.player_id === pp.player_id);
+        if (found) {
+          console.log(`[select] Proof → ${found.player_name} (accuracy_gap=${pp.accuracy_gap})`);
+          return { player: found, top3Players: null, reason: `proof: accuracy_gap=${pp.accuracy_gap}` };
+        }
         const synthetic: PlayerData = {
           player_id: pp.player_id,
           player_name: pp.player_name,
@@ -374,72 +399,130 @@ function buildWeekPlan(
           market_watch_category: "Value",
           games_played: 10,
           player_status: "",
+          is_bye: false,
+          played_last_game: true,
         };
-        return { player: synthetic, top3Players: null };
+        console.log(`[select] Proof synthetic → ${pp.player_name}`);
+        return { player: synthetic, top3Players: null, reason: "proof synthetic" };
       }
-      return { player: pickRandom(dayAvailable().sort((a, b) => b.rank - a.rank), 15), top3Players: null };
+      const fallback = pickRandom(pool.sort((a, b) => b.rank - a.rank), 15);
+      console.log(`[select] Proof fallback → ${fallback?.player_name ?? "none"}`);
+      return { player: fallback, top3Players: null, reason: "proof fallback (no accuracy data)" };
     }
 
+    // SECTION 5: Category-specific pool logic
     if (cat === "Value") {
-      const valuePool = dayAvailable()
+      const sorted = pool
         .filter(p => p.value_score >= VALUE_MIN_VALUE_SCORE && p.risk_rating <= VALUE_MAX_BUST_RISK)
         .sort((a, b) => b.value_score - a.value_score);
-      if (valuePool.length > 0) return { player: pickRandom(valuePool, 25), top3Players: null };
-      return { player: pickRandom(dayAvailable().sort((a, b) => b.rank - a.rank), 15), top3Players: null };
+      // Exclude obvious top 5 to avoid repetition
+      const valuePool = sorted.length > 5 ? sorted.slice(5) : sorted;
+      if (valuePool.length > 0) {
+        const pick = pickFromTiers(valuePool);
+        console.log(`[select] Value → ${pick?.player_name} (value_score=${pick?.value_score})`);
+        return { player: pick, top3Players: null, reason: `value: value_score=${pick?.value_score}` };
+      }
+      const fallback = pickFromTiers(pool.sort((a, b) => b.rank - a.rank));
+      console.log(`[select] Value fallback → ${fallback?.player_name ?? "none"}`);
+      return { player: fallback, top3Players: null, reason: "value fallback" };
     }
 
     if (cat === "Breakout") {
-      const boPool = dayAvailable()
+      const boPool = pool
         .filter(p =>
           (p.upside_pct >= BREAKOUT_MIN_UPSIDE || p.form_score >= BREAKOUT_MIN_FORM) &&
-          p.value_score >= VALUE_MIN_VALUE_SCORE,
+          p.value_score >= VALUE_MIN_VALUE_SCORE &&
+          p.rank <= 100,
         )
         .sort((a, b) => b.upside_pct - a.upside_pct);
-      if (boPool.length > 0) return { player: pickRandom(boPool, 25), top3Players: null };
-      return { player: pickRandom(dayAvailable().sort((a, b) => b.rank - a.rank), 15), top3Players: null };
+      if (boPool.length > 0) {
+        const pick = pickFromTiers(boPool);
+        console.log(`[select] Breakout → ${pick?.player_name} (upside=${pick?.upside_pct})`);
+        return { player: pick, top3Players: null, reason: `breakout: upside=${pick?.upside_pct}` };
+      }
+      const fallback = pickFromTiers(pool.sort((a, b) => b.rank - a.rank));
+      console.log(`[select] Breakout fallback → ${fallback?.player_name ?? "none"}`);
+      return { player: fallback, top3Players: null, reason: "breakout fallback" };
     }
 
     if (cat === "Trap") {
-      const trapPool = dayAvailable()
-        .filter(p => p.value_score <= TRAP_MAX_VALUE_SCORE && p.risk_rating >= TRAP_MIN_BUST_RISK)
+      // Must have high bust risk AND meaningful price (not cheap rookies)
+      const trapPool = pool
+        .filter(p =>
+          p.value_score <= TRAP_MAX_VALUE_SCORE &&
+          p.risk_rating >= TRAP_MIN_BUST_RISK &&
+          p.price >= 400000,
+        )
         .sort((a, b) => b.risk_rating - a.risk_rating);
-      if (trapPool.length > 0) return { player: pickRandom(trapPool, 25), top3Players: null };
-      return { player: pickRandom(dayAvailable().sort((a, b) => b.rank - a.rank), 15), top3Players: null };
+      if (trapPool.length > 0) {
+        const pick = pickRandom(trapPool, 25);
+        console.log(`[select] Trap → ${pick?.player_name} (risk=${pick?.risk_rating}, price=${pick?.price})`);
+        return { player: pick, top3Players: null, reason: `trap: risk=${pick?.risk_rating}` };
+      }
+      const fallback = pickRandom(
+        pool.filter(p => p.risk_rating >= 5).sort((a, b) => b.risk_rating - a.risk_rating),
+        15,
+      );
+      console.log(`[select] Trap fallback → ${fallback?.player_name ?? "none"}`);
+      return { player: fallback, top3Players: null, reason: "trap fallback" };
     }
 
     if (cat === "Engagement" || cat === "Conversation") {
-      return { player: pickRandom(dayAvailable().sort((a, b) => b.rank - a.rank), 20), top3Players: null };
+      const pick = pickFromTiers(pool.sort((a, b) => b.rank - a.rank));
+      console.log(`[select] ${cat} → ${pick?.player_name ?? "none"}`);
+      return { player: pick, top3Players: null, reason: cat };
     }
 
     if (cat === "Injury") {
-      // Use the dedicated injured pool (is_available=false, status=OUT)
-      // These players are NOT in the main active pool so no global dedup needed
-      const injuredPool = injuredPlayers
-        .filter(p => !dayUsedIds.has(p.player_id))
+      // SECTION 2: Injury logic — must be status=OUT, not BYE, and played last game
+      const injuredPool = safeInjured
+        .filter(p =>
+          !dayUsedIds.has(p.player_id) &&
+          p.player_status === "OUT" &&
+          !p.is_bye &&
+          p.played_last_game === true,
+        )
         .sort((a, b) => b.rank - a.rank);
-      if (injuredPool.length > 0) return { player: pickRandom(injuredPool, injuredPool.length), top3Players: null };
-      return { player: undefined, top3Players: null };
+
+      if (injuredPool.length > 0) {
+        const pick = pickRandom(injuredPool, injuredPool.length);
+        console.log(`[select] Injury → ${pick?.player_name} (played_last_game=true, status=OUT)`);
+        return { player: pick, top3Players: null, reason: "injury: status=OUT + played_last_game" };
+      }
+
+      // Fallback: any injured player (relax played_last_game constraint)
+      const anyInjured = safeInjured
+        .filter(p => !dayUsedIds.has(p.player_id) && p.player_status === "OUT" && !p.is_bye)
+        .sort((a, b) => b.rank - a.rank);
+
+      if (anyInjured.length > 0) {
+        const pick = pickRandom(anyInjured, anyInjured.length);
+        console.log(`[select] Injury fallback → ${pick?.player_name} (status=OUT, played_last_game=unknown)`);
+        return { player: pick, top3Players: null, reason: "injury fallback (no played_last_game filter)" };
+      }
+
+      console.log(`[select] Injury: no eligible injured players found`);
+      return { player: undefined, top3Players: null, reason: "injury: no eligible players" };
     }
 
-    return { player: pickRandom(dayAvailable().sort((a, b) => b.rank - a.rank), 15), top3Players: null };
+    const fallback = pickFromTiers(pool.sort((a, b) => b.rank - a.rank));
+    console.log(`[select] Generic fallback → ${fallback?.player_name ?? "none"}`);
+    return { player: fallback, top3Players: null, reason: "generic fallback" };
   }
 
   for (let dayIndex = 0; dayIndex < 7; dayIndex++) {
     const config = DAY_CONFIGS[dayIndex];
     const dayUsedIds = new Set<number>();
 
-    // Resolve slots — may override Saturday Top3 if cap hit
-    const resolvedCategories: Category[] = config.categories.map((cat, slotIdx) => {
+    console.log(`\n[build] === ${config.display} ===`);
+
+    const resolvedCategories: Category[] = config.categories.map((cat) => {
       if (cat === "Top3" && atCap("Top3")) {
-        // Swap to Breakout (or Value if Breakout also capped)
         return atCap("Breakout") ? "Value" : "Breakout";
       }
-      // Saturday slot 0: if this is Saturday and no Friday Top3 was generated yet — still allow
-      // (Friday always generates Top3 unless capped, so by day 5 we'll have 1)
       return cat;
     });
 
-    // Build slot results in priority order
     const slotOrder = resolvedCategories
       .map((cat, idx) => ({ cat, idx }))
       .sort((a, b) => (CATEGORY_PRIORITY[a.cat] ?? 9) - (CATEGORY_PRIORITY[b.cat] ?? 9));
@@ -450,10 +533,17 @@ function buildWeekPlan(
       const angle = config.angles[idx];
       const content_type = config.content_types[idx];
 
-      let { player, top3Players } = selectPlayerForCategory(cat, dayUsedIds);
+      let { player, top3Players, reason } = selectPlayerForCategory(cat, dayUsedIds);
+
+      // SECTION 6: Strict pre-output validation — reject invalid players
+      if (player && !isValidPlayer(player)) {
+        console.warn(`[validate] Rejected ${player.player_name} — is_bye=${player.is_bye}, status=${player.player_status}`);
+        const pool = dayAvailablePool(dayUsedIds);
+        player = pickFromTiers(pool.sort((a, b) => b.rank - a.rank));
+        reason = `replaced invalid player with tier pick`;
+      }
 
       // Anti-spam: no same category 3× in a row globally
-      // (check last 2 posts in allPosts)
       const recentCats = allPosts.slice(-2).map(p => p.category);
       if (
         cat !== "Top3" &&
@@ -462,8 +552,8 @@ function buildWeekPlan(
         recentCats[0] === cat &&
         recentCats[1] === cat
       ) {
-        // Force fallback
         const fb = fallbackCategory(cat);
+        console.log(`[anti-spam] ${cat} appeared 3x in a row — falling back to ${fb}`);
         const fbResult = selectPlayerForCategory(fb, dayUsedIds);
         if (fbResult.player) {
           player = fbResult.player;
@@ -472,10 +562,11 @@ function buildWeekPlan(
       }
 
       if (!player && cat !== "Top3") {
-        const rankPool = players
-          .filter(p => !globalUsedIds.has(p.player_id) && !dayUsedIds.has(p.player_id))
-          .sort((a, b) => b.rank - a.rank);
-        player = rankPool[0] ?? players[0];
+        const rankPool = hardFilter(
+          safePlayers.filter(p => !globalUsedIds.has(p.player_id) && !dayUsedIds.has(p.player_id))
+        ).sort((a, b) => b.rank - a.rank);
+        player = rankPool[0] ?? safePlayers[0];
+        console.log(`[build] Last-resort fallback → ${player?.player_name ?? "none"}`);
       }
 
       // Mark used
@@ -504,6 +595,8 @@ function buildWeekPlan(
         player2_name: null,
         top3_players: top3Players ?? null,
       };
+
+      console.log(`[build] ${config.display} slot ${idx + 1}: ${cat} → ${dayResults[idx]?.player_name} [${reason}]`);
     }
 
     for (const post of dayResults) {
@@ -511,7 +604,7 @@ function buildWeekPlan(
     }
   }
 
-  return validateAndFixPlan(allPosts, players, proofPlayers);
+  return validateAndFixPlan(allPosts, safePlayers, proofPlayers);
 }
 
 // ── VALIDATION + FAILSAFE ─────────────────────────────────────────────────────
@@ -529,25 +622,24 @@ function validateAndFixPlan(
   const proofCount = counts["Proof"] ?? 0;
 
   console.log(`[validate] top3=${top3Count} proof=${proofCount} total=${posts.length}`);
+  console.log(`[validate] category distribution: ${JSON.stringify(counts)}`);
 
-  // Enforce Top3 <= 2: swap excess Top3 posts to Breakout/Value
   if (top3Count > WEEKLY_CAPS["Top3"]) {
     let swapped = 0;
     const target = top3Count - WEEKLY_CAPS["Top3"];
     for (const post of posts) {
       if (swapped >= target) break;
-      if (post.category === "Top3" && post.day_key !== "friday") {
+      if (post.category === "Top3") {
         post.category = "Breakout";
         post.top3_players = null;
         post.content_type = "Short-form Video";
         post.angle = "market_inefficiency";
         swapped++;
-        console.warn(`[validate] Swapped excess Top3 on ${(post as any).day_key ?? "unknown"} → Breakout`);
+        console.warn(`[validate] Swapped excess Top3 → Breakout`);
       }
     }
   }
 
-  // Ensure total = 21 (fill if short)
   if (posts.length < 21) {
     const fillPlayer = players[0];
     while (posts.length < 21) {
@@ -738,8 +830,7 @@ Deno.serve(async (req: Request) => {
       db: { schema: "afl" },
     });
 
-    // Fetch a large active player pool — randomise offset to ensure variety across rebuilds
-    const randomOffset = Math.floor(Math.random() * 30);
+    // Fetch active player pool — filtered at DB level, then again in hardFilter()
     const { data: rawPlayers, error: playersError } = await aflDb
       .from("player_rankings_cache")
       .select(`
@@ -757,7 +848,9 @@ Deno.serve(async (req: Request) => {
       .order("neeko_rating_scaled", { ascending: false })
       .limit(150);
 
-    // Separately fetch injured players (is_available=false, status=OUT, not bye/retired)
+    // SECTION 2 & 3: Injured player fetch
+    // status=OUT, is_bye=false, not retired/delisted
+    // played_last_game derived from games_played > 0 (proxy: if they have recent games)
     const { data: rawInjured } = await aflDb
       .from("player_rankings_cache")
       .select(`
@@ -766,7 +859,7 @@ Deno.serve(async (req: Request) => {
         value_score, best_value_score, neeko_rating_scaled, form_score, consistency,
         captain_score, risk_rating, upside_pct, matchup_label, signal,
         ai_recommendation, recommendation_short, market_watch_category, games_played,
-        is_bye, manual_status, status
+        is_bye, manual_status, status, last_game_date
       `)
       .eq("is_available", false)
       .eq("is_bye", false)
@@ -781,41 +874,58 @@ Deno.serve(async (req: Request) => {
       throw new Error(`Player fetch failed: ${playersError.message}`);
     }
 
-    const mapPlayer = (p: Record<string, unknown>): PlayerData => ({
-      player_id: p.player_id as number,
-      player_name: (p.player_name as string) ?? "Unknown",
-      team: (p.team as string) ?? "Unknown",
-      position: (p.position as string) ?? "MID",
-      projection: Number(p.projection_final ?? 0),
-      ceiling: Number(p.ceiling ?? 0),
-      floor: Number(p.floor ?? 0),
-      price: Number(p.price ?? 0),
-      prev_price: Number(p.prev_price ?? 0),
-      price_change: Number(p.price_change ?? 0),
-      value_score: Number(p.value_score ?? 0),
-      best_value_score: Number(p.best_value_score ?? 0),
-      rank: Number(p.neeko_rating_scaled ?? 0),
-      form_score: Number(p.form_score ?? 0),
-      consistency: Number(p.consistency ?? 0),
-      captain_score: Number(p.captain_score ?? 0),
-      risk_rating: Number(p.risk_rating ?? 5),
-      upside_pct: Number(p.upside_pct ?? 0),
-      matchup_label: (p.matchup_label as string) ?? "",
-      signal: (p.signal as string) ?? "",
-      ai_recommendation: (p.ai_recommendation as string) ?? "",
-      recommendation_short: (p.recommendation_short as string) ?? "",
-      market_watch_category: (p.market_watch_category as string) ?? "",
-      games_played: Number(p.games_played ?? 0),
-      player_status: (p.status as string) ?? "",
-    });
+    // SECTION 3: Determine played_last_game — true if last_game_date within 14 days
+    const fourteenDaysAgo = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000);
 
-    // Shuffle the full active pool so the same top-N aren't always selected
-    const shuffledActive = shuffleTopN(rawPlayers ?? [], (rawPlayers ?? []).length);
-    const mappedPlayers: PlayerData[] = shuffledActive.map(p => mapPlayer(p as Record<string, unknown>));
+    const mapPlayer = (p: Record<string, unknown>): PlayerData => {
+      // played_last_game: last_game_date exists and within 14 days (ignores bye rounds)
+      let playedLastGame = false;
+      if (p.last_game_date) {
+        const lastGame = new Date(p.last_game_date as string);
+        playedLastGame = lastGame >= fourteenDaysAgo;
+      } else if (Number(p.games_played ?? 0) > 0) {
+        // No date available — assume true if they have any games this season
+        playedLastGame = true;
+      }
 
-    // Merge injured players into the pool (they're eligible only for Injury category posts)
+      return {
+        player_id: p.player_id as number,
+        player_name: (p.player_name as string) ?? "Unknown",
+        team: (p.team as string) ?? "Unknown",
+        position: (p.position as string) ?? "MID",
+        projection: Number(p.projection_final ?? 0),
+        ceiling: Number(p.ceiling ?? 0),
+        floor: Number(p.floor ?? 0),
+        price: Number(p.price ?? 0),
+        prev_price: Number(p.prev_price ?? 0),
+        price_change: Number(p.price_change ?? 0),
+        value_score: Number(p.value_score ?? 0),
+        best_value_score: Number(p.best_value_score ?? 0),
+        rank: Number(p.neeko_rating_scaled ?? 0),
+        form_score: Number(p.form_score ?? 0),
+        consistency: Number(p.consistency ?? 0),
+        captain_score: Number(p.captain_score ?? 0),
+        risk_rating: Number(p.risk_rating ?? 5),
+        upside_pct: Number(p.upside_pct ?? 0),
+        matchup_label: (p.matchup_label as string) ?? "",
+        signal: (p.signal as string) ?? "",
+        ai_recommendation: (p.ai_recommendation as string) ?? "",
+        recommendation_short: (p.recommendation_short as string) ?? "",
+        market_watch_category: (p.market_watch_category as string) ?? "",
+        games_played: Number(p.games_played ?? 0),
+        player_status: (p.status as string) ?? "",
+        is_bye: Boolean(p.is_bye ?? false),
+        played_last_game: playedLastGame,
+      };
+    };
+
+    const mappedPlayers: PlayerData[] = (rawPlayers ?? []).map(p => mapPlayer(p as Record<string, unknown>));
     const mappedInjured: PlayerData[] = (rawInjured ?? []).map(p => mapPlayer(p as Record<string, unknown>));
-    const allPlayers: PlayerData[] = [...mappedPlayers, ...mappedInjured];
+
+    console.log(
+      `[plan-builder] Fetched ${mappedPlayers.length} active, ${mappedInjured.length} injured. ` +
+      `Injured with played_last_game=true: ${mappedInjured.filter(p => p.played_last_game).length}`,
+    );
 
     // Load recently used player IDs (past 3 days) to avoid repeats across rebuilds
     const threeDaysAgo = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString();
@@ -825,14 +935,11 @@ Deno.serve(async (req: Request) => {
       .gte("used_at", threeDaysAgo);
     const recentlyUsedIds = new Set<number>((recentUsage ?? []).map((r: { player_id: number }) => r.player_id));
 
-    // Filter recently used from the active pool (but keep injured players available)
     const freshPlayers = mappedPlayers.filter(p => !recentlyUsedIds.has(p.player_id));
-    // Fall back to full pool if too few fresh players remain
     const selectionPool = freshPlayers.length >= 30 ? freshPlayers : mappedPlayers;
 
     console.log(
-      `[plan-builder] ${mappedPlayers.length} active + ${mappedInjured.length} injured players. ` +
-      `Fresh (not used in 3d): ${freshPlayers.length}. Using pool of ${selectionPool.length}.`,
+      `[plan-builder] Fresh (not used in 3d): ${freshPlayers.length}. Using pool of ${selectionPool.length}.`,
     );
 
     const lastRoundResult = await db.rpc("get_latest_completed_round");
@@ -871,7 +978,7 @@ Deno.serve(async (req: Request) => {
     }
 
     console.log(
-      `[plan-builder] ${selectionPool.length} selection pool, ${mappedInjured.length} injured, ${proofPlayers.length} proof players, round ${roundNum}`,
+      `[plan-builder] Pool=${selectionPool.length}, injured=${mappedInjured.length}, proof=${proofPlayers.length}, round=${roundNum}`,
     );
 
     const { data: existingPlan } = await db
@@ -915,17 +1022,13 @@ Deno.serve(async (req: Request) => {
       console.log(`[plan-builder] Created new plan ${planId}`);
     }
 
-    // ── Build the week plan with all constraints ───────────────────────────────
-    // selectionPool = fresh active players (not used in 3d, or full pool if too few)
-    // allPlayers = active + injured (injured only used for Injury category)
     const weekPosts = buildWeekPlan(selectionPool, proofPlayers, mappedInjured);
 
-    // Log category distribution for debugging
     const catCounts: Record<string, number> = {};
     for (const p of weekPosts) {
       catCounts[p.category] = (catCounts[p.category] ?? 0) + 1;
     }
-    console.log("[plan-builder] Category distribution:", JSON.stringify(catCounts));
+    console.log("[plan-builder] Final category distribution:", JSON.stringify(catCounts));
 
     const postsToInsert = weekPosts.map((post, idx) => {
       const dayIndex = Math.floor(idx / 3);
@@ -958,7 +1061,6 @@ Deno.serve(async (req: Request) => {
       throw new Error(`Failed to insert posts: ${insertError.message}`);
     }
 
-    // Persist usage records so these players are skipped on the next rebuild
     const usageRows = weekPosts
       .filter(p => p.player_id && p.player_id > 0)
       .map((post, idx) => {
