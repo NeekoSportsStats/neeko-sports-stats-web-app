@@ -125,6 +125,35 @@ function getWeekLabel(): string {
 
 // ─── API helpers ──────────────────────────────────────────────────────────────
 
+function getWeekKey(): string {
+  const now = new Date();
+  const day = now.getDay();
+  const diff = now.getDate() - day + (day === 0 ? -6 : 1);
+  const mon = new Date(now);
+  mon.setDate(diff);
+  return mon.toISOString().slice(0, 10);
+}
+
+async function fetchExistingPlan(): Promise<{ plan_id: string; posts: Post[] } | null> {
+  const weekKey = getWeekKey();
+  const { data: plan } = await supabase
+    .from("weekly_content_plans")
+    .select("id")
+    .eq("week_key", weekKey)
+    .maybeSingle();
+
+  if (!plan?.id) return null;
+
+  const { data: posts } = await supabase
+    .from("weekly_content_posts")
+    .select("*")
+    .eq("weekly_plan_id", plan.id)
+    .order("day_number")
+    .order("slot_number");
+
+  return { plan_id: plan.id, posts: (posts ?? []) as Post[] };
+}
+
 async function callPlanBuilder(force = false): Promise<{ plan_id: string; posts: Post[] }> {
   const { data: { session } } = await supabase.auth.getSession();
   const token = session?.access_token ?? ANON_KEY;
@@ -802,17 +831,19 @@ export default function AdminWeeklyPlanner() {
   const readyTotal = posts.filter((p) => p.status === "ready").length;
   const pendingTotal = posts.filter((p) => p.status === "pending").length;
 
-  // Load plan on mount
+  // Load plan on mount — fast direct DB fetch, no edge function call
   useEffect(() => {
     let cancelled = false;
     async function load() {
       setLoading(true);
       setError(null);
       try {
-        const result = await callPlanBuilder(false);
+        const result = await fetchExistingPlan();
         if (!cancelled) {
-          setPlanId(result.plan_id);
-          setPosts(result.posts as Post[]);
+          if (result) {
+            setPlanId(result.plan_id);
+            setPosts(result.posts);
+          }
         }
       } catch (e) {
         if (!cancelled) setError(e instanceof Error ? e.message : String(e));
@@ -944,13 +975,17 @@ export default function AdminWeeklyPlanner() {
     try {
       const result = await callPlanBuilder(true);
       setPlanId(result.plan_id);
-      setPosts(result.posts as Post[]);
+      setPosts((result.posts ?? []) as Post[]);
+      // Reload players after build if not already loaded
+      if (players.length === 0) {
+        fetchPlayers().then(setPlayers).catch(() => {});
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
       setRebuilding(false);
     }
-  }, []);
+  }, [players.length]);
 
   // ── Render ─────────────────────────────────────────────────────────────────
 
@@ -979,6 +1014,32 @@ export default function AdminWeeklyPlanner() {
         >
           Retry
         </button>
+      </div>
+    );
+  }
+
+  // No plan exists yet — show empty state
+  if (!planId && !loading) {
+    return (
+      <div className="rounded-xl border border-border bg-muted/10 p-10 text-center space-y-4">
+        <Sparkles className="h-10 w-10 text-muted-foreground/40 mx-auto" />
+        <div>
+          <p className="text-sm font-semibold">No plan for this week yet</p>
+          <p className="text-xs text-muted-foreground mt-1">
+            Build a 7-day content plan with 3 posts per day.
+          </p>
+        </div>
+        <button
+          onClick={handleRebuild}
+          disabled={rebuilding}
+          className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-foreground text-background text-sm font-semibold hover:opacity-90 disabled:opacity-50 transition-opacity"
+        >
+          <Sparkles className="h-4 w-4" />
+          {rebuilding ? "Building plan…" : "Build This Week's Plan"}
+        </button>
+        {error && (
+          <p className="text-xs text-red-600 dark:text-red-400">{error}</p>
+        )}
       </div>
     );
   }
