@@ -1356,11 +1356,17 @@ export default function AdminContentEngine() {
       return;
     }
 
+    if (!post.category || post.category.trim() === "") {
+      console.error("[ContentEngine] Invalid post — missing category", post);
+      toast({ title: "Invalid post", description: "Post is missing a category — cannot generate.", variant: "destructive" });
+      return;
+    }
+
     activeGenerations.current.add(post.id);
     setGeneratingPostId(post.id);
     updatePost({ ...post, status: "generating" });
 
-    console.log("[ContentEngine] Generating post:", post.id, post.category, post.player_name);
+    console.log("[ContentEngine] Generating post:", { post_id: post.id, category: post.category, player_id: post.player_id, player_name: post.player_name });
 
     try {
       const { data, error: fnError } = await supabase.functions.invoke(

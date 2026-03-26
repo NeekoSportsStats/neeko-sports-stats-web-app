@@ -845,6 +845,16 @@ export default function AdminWeeklyPlanner() {
   const handleGenerate = useCallback(
     async (postId: string) => {
       if (generatingRef.current.has(postId)) return;
+
+      const post = posts.find((p) => p.id === postId);
+      if (!post?.category || post.category.trim() === "") {
+        console.error("[WeeklyPlanner] Invalid post — missing category", { postId, post });
+        updatePostField(postId, { status: "error", error_message: "Missing category — cannot generate" });
+        return;
+      }
+
+      console.log("[WeeklyPlanner] Generating post:", { post_id: postId, category: post.category, player_id: post.player_id, player_name: post.player_name });
+
       generatingRef.current.add(postId);
       updatePostField(postId, { status: "generating", error_message: null });
       try {
@@ -859,7 +869,7 @@ export default function AdminWeeklyPlanner() {
         generatingRef.current.delete(postId);
       }
     },
-    [updatePost, updatePostField],
+    [posts, updatePost, updatePostField],
   );
 
   const handleGenerateDay = useCallback(

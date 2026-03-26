@@ -951,12 +951,34 @@ Deno.serve(async (req: Request) => {
       .eq("id", postId);
 
     const typedPost = postRow as PostRow;
+
+    // SECTION 6: Guard — category must exist
+    if (!typedPost.category || typedPost.category.trim() === "") {
+      console.error(`[generate-content-post] Post ${postId} has no category — cannot generate`);
+      await db
+        .from("weekly_content_posts")
+        .update({ status: "error", error_message: "Missing category — invalid post input", updated_at: new Date().toISOString() })
+        .eq("id", postId);
+      return new Response(
+        JSON.stringify({ error: "Missing category — invalid post input", post_id: postId }),
+        { status: 422, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
+    // SECTION 4: Debug logging
+    console.log(`[generate-content-post] Creating post:`, {
+      post_id: postId,
+      category: typedPost.category,
+      player_id: typedPost.player_id,
+      player_name: typedPost.player_name,
+    });
+
     const isTop3 = typedPost.category === "Top3";
     const top3Players = isTop3 && Array.isArray(typedPost.top3_players) && typedPost.top3_players.length >= 3
       ? typedPost.top3_players as Top3Player[]
       : null;
 
-    const category = typedPost.category ?? "Value";
+    const category = typedPost.category;
 
     // SECTION 3 & 5: Unified contentPayload — single source of truth, never TBD/Unknown
     // If player_name is missing, we cannot generate meaningful content — abort with error
