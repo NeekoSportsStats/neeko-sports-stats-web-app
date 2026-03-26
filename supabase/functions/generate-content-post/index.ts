@@ -59,6 +59,8 @@ interface PlayerCache {
   recommendation_short: string;
   market_watch_category: string;
   games_played: number;
+  player_status: string | null;
+  manual_status: string | null;
 }
 
 // ── GUARANTEED PLATFORM STRUCTURE ─────────────────────────────────────────────
@@ -409,9 +411,11 @@ TOP 3 POST RULES:
   {Closing CTA line — e.g. 'Full breakdown at Neeko Sports — link in bio.'}"
 
 INJURY ALERT POST RULES:
+- CRITICAL: ONLY generate an Injury post if the player data explicitly states player_status = "OUT". NEVER invent, assume, or imply an injury if the status is not confirmed in the data provided.
 - Urgent tone — breaking news style.
 - Voice: "BREAKING — [Player] is OUT this round. Three replacement options: ..."
 - Visual: Red "BREAKING" banner. Injured player name with cross. Three replacement rows in green.
+- DO NOT use phrases like "may be injured", "could miss", "is a concern", or any speculative injury language. Only state confirmed OUT status.
 
 CONVERSATION POST RULES:
 - Single sharp question or poll. No player data required.
@@ -513,8 +517,15 @@ function buildUserPrompt(
     ? ` (${player.price_change > 0 ? "+" : ""}$${Math.round(player.price_change / 1000)}k this week)`
     : "";
 
+  const injuryStatusLine = player?.player_status === "OUT"
+    ? `Player Status: OUT (CONFIRMED INJURED — this is a real confirmed injury)`
+    : player?.manual_status === "OUT"
+    ? `Player Status: OUT (CONFIRMED INJURED — manually confirmed)`
+    : `Player Status: ${player?.player_status ?? "ACTIVE"}`;
+
   const playerInfo = player
     ? `Player: ${player.player_name} (${player.team}, ${player.position})
+${injuryStatusLine}
 Rank: #${player.rank}
 Projection: ${Math.round(player.projection_final)}pts
 Ceiling: ${Math.round(player.ceiling)}pts
@@ -555,7 +566,7 @@ Consistency: ${Math.round(player2.consistency)}%`
     Captain: "This is a CAPTAIN post. This player has the highest captain_score and projection in the pool. The data is decisive — reference their projection, ceiling, and consistency. Lock them in.",
     Proof: "This is a PROOF post. The model called this. Show the actual score vs the projected score — the gap must be ≤5pts. Voice script MUST say: 'We projected [Player] at [projected]pts last round — they scored [actual]pts. That's [gap]pts off. The model works.' Build credibility with real numbers. No waffle.",
     H2H: "This is a HEAD-TO-HEAD debate post. Force the audience to choose between the two players. No neutral answer allowed. Every element drives comments.",
-    Injury: "This is an INJURY ALERT post. Player status is INJURED — do NOT list them as a pick. Create urgency: who replaces them? Give 3 clear replacement options with projections and prices. Urgent breaking-news tone.",
+    Injury: "This is an INJURY ALERT post. The player data confirms this player's status is OUT. Do NOT list them as a pick. Create urgency: who replaces them? Give 3 clear replacement options with projections and prices. Urgent breaking-news tone. CRITICAL: ONLY use the injury status explicitly confirmed in the player data. NEVER invent, assume, or speculate about injuries not stated in the data.",
     Conversation: "This is a CONVERSATION post. Ask a sharp question or run a poll. No player stats needed. Drive comment engagement above all else.",
     Engagement: "This is an ENGAGEMENT post. Ask a sharp question, run a poll, or spark a debate. Pick a controversial topic in AFL Fantasy. Drive comments above all else.",
   };
@@ -1146,6 +1157,36 @@ Deno.serve(async (req: Request) => {
         .eq("player_id", typedPost.player2_id)
         .maybeSingle();
       player2Data = pd2 ?? null;
+    }
+
+    // ── Injury guard — reject if no confirmed injury status ───────────────────
+    if (typedPost.category === "Injury") {
+      const confirmedOut =
+        playerData?.player_status === "OUT" ||
+        playerData?.manual_status === "OUT";
+      if (!confirmedOut) {
+        const reason = playerData
+          ? `player_status="${playerData.player_status ?? "null"}", manual_status="${playerData.manual_status ?? "null"}"`
+          : "no player data found in cache";
+        console.error(`[generate-content-post] Injury guard: post ${postId} rejected — ${reason}`);
+        await db
+          .from("weekly_content_posts")
+          .update({
+            status: "error",
+            error_message: `Injury post blocked: ${post.player_name ?? "player"} has no confirmed OUT status. Select a genuinely injured player before generating.`,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", postId);
+        return new Response(
+          JSON.stringify({
+            error: "Injury post blocked — no confirmed injury",
+            detail: reason,
+            post_id: postId,
+          }),
+          { status: 422, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+      console.log(`[generate-content-post] Injury guard passed for ${postId} — player_status=${playerData?.player_status}`);
     }
 
     let aiSummary: string = "No AI analysis available yet.";

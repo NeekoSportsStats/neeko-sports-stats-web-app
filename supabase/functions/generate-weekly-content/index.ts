@@ -583,19 +583,10 @@ function buildWeekPlan(
         return { player: pick, top3Players: null, reason: "injury fallback (no played_last_game filter)" };
       }
 
-      // SECTION 4: No injured players available — fall back to high-risk active players
-      const highRiskFallback = pool
-        .filter(p => p.risk_rating >= 6)
-        .sort((a, b) => b.risk_rating - a.risk_rating);
-      if (highRiskFallback.length > 0) {
-        const pick = pickRandom(highRiskFallback, highRiskFallback.length);
-        console.log(`[select] Injury: no injured players — using high-risk active fallback → ${pick?.player_name}`);
-        return { player: pick, top3Players: null, reason: "injury fallback: high-risk active player" };
-      }
-      // Last resort: any active player by rank
-      const lastResort = pool.sort((a, b) => b.rank - a.rank)[0];
-      console.log(`[select] Injury: no eligible injured or high-risk players — using rank fallback → ${lastResort?.player_name ?? "NONE"}`);
-      return { player: lastResort, top3Players: null, reason: "injury fallback: rank fallback" };
+      // SECTION 4: No injured players available — do NOT fabricate an Injury post.
+      // Return undefined so the caller can convert this slot to a safe fallback category.
+      console.warn(`[select] Injury: no confirmed injured players available — slot will be converted to Value`);
+      return { player: undefined, top3Players: null, reason: "injury: no confirmed injured players" };
     }
 
     const fallback = pickFromTiers(pool.sort((a, b) => b.rank - a.rank));
@@ -655,7 +646,34 @@ function buildWeekPlan(
       }
 
       // SECTION 1: NEVER allow null player — guaranteed fallback for all non-Top3 slots
-      if (!player && cat !== "Top3") {
+      // Exception: Injury with no confirmed injured players → convert slot to Value (never fabricate)
+      if (!player && cat === "Injury") {
+        console.warn(`[build] Injury slot has no confirmed injured players — converting to Value`);
+        const valueResult = selectPlayerForCategory("Value", dayUsedIds);
+        player = valueResult.player;
+        top3Players = null;
+        reason = "injury->value: no confirmed injured players";
+        // Override the category stored in the post so content generation uses Value, not Injury
+        const injurySlotFallback: PostSelection = {
+          player_id: player?.player_id ?? 0,
+          player_name: player?.player_name ?? null,
+          team: player?.team ?? "",
+          category: "Value",
+          angle: config.angles[idx],
+          content_type: config.content_types[idx],
+          player2_id: null,
+          player2_name: null,
+          top3_players: null,
+        };
+        if (player) {
+          globalUsedIds.add(player.player_id);
+          dayUsedIds.add(player.player_id);
+          incCount("Value");
+          dayResults[idx] = injurySlotFallback;
+          console.log(`[build] ${config.display} slot ${idx + 1}: Injury→Value → ${player.player_name} [${reason}]`);
+        }
+        continue;
+      } else if (!player && cat !== "Top3") {
         player = guaranteedFallback(dayUsedIds, cat);
         console.warn(`[build] Last-resort fallback used → ${player?.player_name ?? "NONE"}`);
       }
