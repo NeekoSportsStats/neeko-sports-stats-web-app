@@ -120,7 +120,7 @@ export async function getContentOpportunities(): Promise<ContentOpportunity[]> {
     .schema("afl" as any)
     .from("player_rankings_cache")
     .select(COLUMNS)
-    .order("neeko_rating_scaled", { ascending: false, nullsFirst: false })
+    .order("neeko_rating_scaled", { ascending: false })
     .limit(500);
 
   if (error) throw error;

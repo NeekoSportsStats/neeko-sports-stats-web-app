@@ -44,33 +44,42 @@ export function track(event: string, properties?: Record<string, unknown>) {
 export function logEvent(event: string, properties?: Record<string, unknown>) {
   if (typeof window === "undefined") return;
 
-  const sessionId = getSessionId();
-  const page = (properties?.page as string | undefined) ?? window.location.pathname;
+  try {
+    const sessionId = getSessionId();
+    const page = (properties?.page as string | undefined) ?? window.location.pathname;
 
-  supabase.auth.getSession().then(({ data: { session } }) => {
-    const userId = session?.user?.id ?? null;
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      const userId = session?.user?.id ?? null;
 
-    const metadata: Record<string, unknown> = {};
-    if (properties) {
-      for (const [k, v] of Object.entries(properties)) {
-        if (k !== "page") metadata[k] = v;
+      const metadata: Record<string, unknown> = {};
+      if (properties) {
+        for (const [k, v] of Object.entries(properties)) {
+          if (k !== "page") metadata[k] = v;
+        }
       }
-    }
 
-    supabase
-      .schema("analytics" as never)
-      .from("events" as never)
-      .insert({
-        event_name: event,
-        session_id: sessionId,
-        user_id: userId,
-        page,
-        metadata: Object.keys(metadata).length > 0 ? metadata : {},
-      })
-      .then(({ error }) => {
-        if (error) console.warn("[analytics] logEvent failed:", error.message);
-      });
-  });
+      supabase
+        .schema("analytics" as never)
+        .from("events" as never)
+        .insert({
+          event_name: event,
+          session_id: sessionId,
+          user_id: userId,
+          page,
+          metadata: Object.keys(metadata).length > 0 ? metadata : {},
+        })
+        .then(({ error }) => {
+          if (error) console.warn("[analytics] logEvent failed:", error.message);
+        })
+        .catch((e: unknown) => {
+          console.warn("[analytics] logEvent threw:", e);
+        });
+    }).catch((e: unknown) => {
+      console.warn("[analytics] getSession failed:", e);
+    });
+  } catch (e) {
+    console.warn("[analytics] logEvent error:", e);
+  }
 }
 
 export function identifyUser(user: { id: string; email?: string }) {

@@ -384,7 +384,7 @@ export default function AdminContentEngineV3() {
         .from("player_rankings_cache")
         .select("player_id,player_name,team,position,projection_final,ceiling,price,value_score,form_score,neeko_rating_scaled,ai_recommendation,summary_short")
         .eq("is_available", true)
-        .order("neeko_rating_scaled", { ascending: false, nullsFirst: false })
+        .order("neeko_rating_scaled", { ascending: false })
         .limit(300);
       if (data) setPlayers(data as RankingsPlayer[]);
     } finally {

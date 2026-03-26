@@ -76,9 +76,9 @@ interface TopPostPlayer {
   team: string;
   value_score: number | null;
   projection_final: number | null;
-  consistency_score: number | null;
+  consistency: number | null;
   neeko_rating_scaled: number | null;
-  recommendation: string | null;
+  ai_recommendation: string | null;
 }
 
 interface TodayTopPost {
@@ -679,21 +679,32 @@ function TodayTopPostsSection() {
   const generate = async () => {
     setLoading(true);
     try {
-      const { data } = await supabase
+      console.log("[AdminContentEngine] Fetching rankings from player_rankings_cache");
+      const { data, error } = await supabase
         .schema("afl" as never)
         .from("player_rankings_cache")
-        .select("player_id, player_name, team, value_score, projection_final, consistency_score, neeko_rating_scaled, recommendation")
+        .select("player_id, player_name, team, value_score, projection_final, consistency, neeko_rating_scaled, ai_recommendation")
         .eq("is_available", true)
         .not("projection_final", "is", null)
-        .order("neeko_rating_scaled", { ascending: false, nullsFirst: false })
+        .order("neeko_rating_scaled", { ascending: false })
         .limit(30);
 
-      if (!data || data.length === 0) return;
+      if (error) {
+        console.error("[AdminContentEngine] Rankings fetch failed:", error);
+        return;
+      }
+
+      if (!data || data.length === 0) {
+        console.warn("[AdminContentEngine] No players returned from rankings query");
+        return;
+      }
+
+      console.log(`[AdminContentEngine] Fetched ${data.length} players`);
 
       const players = data as TopPostPlayer[];
       const valuePlayer = [...players].sort((a, b) => (b.value_score ?? 0) - (a.value_score ?? 0))[0];
       const controversialPlayer = players[Math.floor(Math.random() * Math.min(players.length, 10))];
-      const proofPlayer = players.find((p) => p.recommendation?.toLowerCase().includes("buy") || p.recommendation?.toLowerCase().includes("strong")) ?? players[2];
+      const proofPlayer = players.find((p) => p.ai_recommendation?.toLowerCase().includes("buy") || p.ai_recommendation?.toLowerCase().includes("strong")) ?? players[2];
 
       const results: TodayTopPost[] = [
         {
@@ -712,7 +723,7 @@ function TodayTopPostsSection() {
           type: "PROOF",
           player: proofPlayer,
           hook: `We said to pick ${proofPlayer.player_name} last round. Here's what happened.`,
-          caption: `${proofPlayer.player_name} from ${proofPlayer.team} delivered. The model flagged them early — the data was clear. Now the market is catching up. ${proofPlayer.recommendation ?? "The edge is still there this week."}`
+          caption: `${proofPlayer.player_name} from ${proofPlayer.team} delivered. The model flagged them early — the data was clear. Now the market is catching up. ${proofPlayer.ai_recommendation ?? "The edge is still there this week."}`
         },
       ];
 
