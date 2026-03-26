@@ -773,6 +773,7 @@ function TodayTopPostsSection() {
 function PostDetailPanel({
   post,
   onRegenerate,
+  onRewrite,
   regenerating,
   onToggleLock,
   onDuplicate,
@@ -782,6 +783,7 @@ function PostDetailPanel({
 }: {
   post: WeeklyContentPost;
   onRegenerate: (post: WeeklyContentPost) => void;
+  onRewrite: (post: WeeklyContentPost) => void;
   regenerating: boolean;
   onToggleLock: (post: WeeklyContentPost) => void;
   onDuplicate: (post: WeeklyContentPost) => void;
@@ -923,11 +925,20 @@ function PostDetailPanel({
           <button
             onClick={() => onRegenerate(post)}
             disabled={regenerating || post.locked}
-            title={post.locked ? "Post is locked — unlock to regenerate" : "Regenerate this post"}
+            title={post.locked ? "Post is locked — unlock to regenerate" : "New player + new content"}
             className="flex items-center gap-1.5 px-2.5 py-1.5 border border-border text-xs rounded-md hover:bg-accent transition-colors disabled:opacity-50"
           >
             <RefreshCw className={`h-3.5 w-3.5 ${regenerating ? "animate-spin" : ""}`} />
             {regenerating ? "Regen…" : "Regen"}
+          </button>
+          <button
+            onClick={() => onRewrite(post)}
+            disabled={regenerating || post.locked}
+            title={post.locked ? "Post is locked — unlock to rewrite" : "Same player, new content"}
+            className="flex items-center gap-1.5 px-2.5 py-1.5 border border-border text-xs rounded-md hover:bg-accent transition-colors disabled:opacity-50"
+          >
+            <Pencil className={`h-3.5 w-3.5 ${regenerating ? "animate-spin" : ""}`} />
+            {regenerating ? "Rewriting…" : "Rewrite"}
           </button>
         </div>
       </div>
@@ -1172,6 +1183,7 @@ function DayRow({
   selectedPostId,
   onSelectPost,
   onGeneratePost,
+  onRegenPost,
   generatingPostId,
   onToggleLock,
   onDuplicate,
@@ -1184,6 +1196,7 @@ function DayRow({
   selectedPostId: string | null;
   onSelectPost: (post: WeeklyContentPost | null) => void;
   onGeneratePost: (post: WeeklyContentPost) => void;
+  onRegenPost: (post: WeeklyContentPost) => void;
   generatingPostId: string | null;
   onToggleLock: (post: WeeklyContentPost) => void;
   onDuplicate: (post: WeeklyContentPost) => void;
@@ -1270,7 +1283,8 @@ function DayRow({
           {selectedPost && selectedPost.status === "ready" && (
             <PostDetailPanel
               post={selectedPost}
-              onRegenerate={onGeneratePost}
+              onRegenerate={onRegenPost}
+              onRewrite={onGeneratePost}
               regenerating={generatingPostId === selectedPost.id}
               onToggleLock={onToggleLock}
               onDuplicate={onDuplicate}
@@ -1404,6 +1418,23 @@ export default function AdminContentEngine() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const selectNewPlayerForPost = useCallback((
+    category: string,
+    currentPlayerId: number | null,
+    usedPlayerIds: Set<number>,
+  ): { player_id: number; player_name: string; team: string } | null => {
+    if (availablePlayers.length === 0) return null;
+
+    const excluded = new Set([...(currentPlayerId ? [currentPlayerId] : []), ...usedPlayerIds]);
+    const pool = availablePlayers.filter(p => !excluded.has(p.player_id));
+    const fallback = availablePlayers.filter(p => p.player_id !== currentPlayerId);
+    const candidates = pool.length > 0 ? pool : fallback;
+    if (candidates.length === 0) return null;
+
+    const pick = candidates[Math.floor(Math.random() * Math.min(candidates.length, 10))];
+    return { player_id: pick.player_id, player_name: pick.player_name, team: pick.team };
+  }, [availablePlayers]);
+
   const generatePost = useCallback(async (post: WeeklyContentPost) => {
     if (activeGenerations.current.has(post.id)) return;
     if (post.locked) {
@@ -1450,6 +1481,86 @@ export default function AdminContentEngine() {
       setGeneratingPostId(null);
     }
   }, [toast, updatePost]);
+
+  const regenPost = useCallback(async (post: WeeklyContentPost) => {
+    if (activeGenerations.current.has(post.id)) return;
+    if (post.locked) {
+      toast({ title: "Post is locked", description: "Unlock before regenerating.", variant: "destructive" });
+      return;
+    }
+    if (post.category === "Top3" || post.category === "Conversation" || post.category === "Engagement") {
+      return generatePost(post);
+    }
+
+    activeGenerations.current.add(post.id);
+    setGeneratingPostId(post.id);
+    updatePost({ ...post, status: "generating" });
+
+    try {
+      const dayPosts = posts.filter(p => p.day_key === post.day_key && p.id !== post.id);
+      const usedInDay = new Set<number>(dayPosts.map(p => p.player_id).filter((id): id is number => id !== null));
+
+      const newPlayer = selectNewPlayerForPost(post.category, post.player_id, usedInDay);
+
+      if (!newPlayer) {
+        activeGenerations.current.delete(post.id);
+        setGeneratingPostId(null);
+        return generatePost(post);
+      }
+
+      const { error: updateError } = await supabase
+        .from("weekly_content_posts")
+        .update({
+          player_id: newPlayer.player_id,
+          player_name: newPlayer.player_name,
+          team: newPlayer.team,
+          status: "pending",
+          hooks: null,
+          voice_script: null,
+          caption_script: null,
+          visual_plan: null,
+          ai_image_prompt: null,
+          ai_video_prompt: null,
+          strategy_json: null,
+          platform_variants: null,
+          error_message: null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", post.id);
+
+      if (updateError) throw new Error(updateError.message);
+
+      const updatedPost: WeeklyContentPost = {
+        ...post,
+        player_id: newPlayer.player_id,
+        player_name: newPlayer.player_name,
+        team: newPlayer.team,
+        status: "pending",
+        hooks: null,
+        voice_script: null,
+        caption_script: null,
+        visual_plan: null,
+        ai_image_prompt: null,
+        ai_video_prompt: null,
+        strategy_json: null,
+        platform_variants: null,
+        error_message: null,
+      };
+      updatePost(updatedPost);
+
+      activeGenerations.current.delete(post.id);
+      setGeneratingPostId(null);
+
+      await generatePost(updatedPost);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Regen failed";
+      console.error("[ContentEngine] Regen failed:", post.id, msg);
+      updatePost({ ...post, status: "error", error_message: msg });
+      toast({ title: `Regen failed: ${post.player_name ?? post.category}`, description: msg, variant: "destructive" });
+      activeGenerations.current.delete(post.id);
+      setGeneratingPostId(null);
+    }
+  }, [posts, selectNewPlayerForPost, generatePost, updatePost, toast]);
 
   const handleToggleLock = useCallback(async (post: WeeklyContentPost) => {
     const newLocked = !post.locked;
@@ -1617,6 +1728,7 @@ export default function AdminContentEngine() {
                 selectedPostId={selectedPostId}
                 onSelectPost={post => setSelectedPostId(post?.id ?? null)}
                 onGeneratePost={generatePost}
+                onRegenPost={regenPost}
                 generatingPostId={generatingPostId}
                 onToggleLock={handleToggleLock}
                 onDuplicate={handleDuplicate}
