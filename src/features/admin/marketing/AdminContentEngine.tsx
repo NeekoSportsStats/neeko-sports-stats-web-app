@@ -1362,6 +1362,12 @@ export default function AdminContentEngine() {
       return;
     }
 
+    if (post.category !== "Top3" && !post.player_id) {
+      console.error("[ContentEngine] Skipping invalid post — missing player_id", post);
+      toast({ title: "Invalid post", description: "Post has no player assigned — cannot generate.", variant: "destructive" });
+      return;
+    }
+
     activeGenerations.current.add(post.id);
     setGeneratingPostId(post.id);
     updatePost({ ...post, status: "generating" });

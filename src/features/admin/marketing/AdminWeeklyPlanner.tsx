@@ -853,6 +853,12 @@ export default function AdminWeeklyPlanner() {
         return;
       }
 
+      if (post.category !== "Top3" && !post.player_id) {
+        console.error("[WeeklyPlanner] Skipping invalid post — missing player_id", { postId, post });
+        updatePostField(postId, { status: "error", error_message: "Missing player — cannot generate" });
+        return;
+      }
+
       console.log("[WeeklyPlanner] Generating post:", { post_id: postId, category: post.category, player_id: post.player_id, player_name: post.player_name });
 
       generatingRef.current.add(postId);

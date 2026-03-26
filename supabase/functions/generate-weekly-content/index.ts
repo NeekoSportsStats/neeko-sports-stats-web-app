@@ -520,8 +520,19 @@ function buildWeekPlan(
         return { player: pick, top3Players: null, reason: "injury fallback (no played_last_game filter)" };
       }
 
-      console.log(`[select] Injury: no eligible injured players found`);
-      return { player: undefined, top3Players: null, reason: "injury: no eligible players" };
+      // SECTION 4: No injured players available — fall back to high-risk active players
+      const highRiskFallback = pool
+        .filter(p => p.risk_rating >= 6)
+        .sort((a, b) => b.risk_rating - a.risk_rating);
+      if (highRiskFallback.length > 0) {
+        const pick = pickRandom(highRiskFallback, highRiskFallback.length);
+        console.log(`[select] Injury: no injured players — using high-risk active fallback → ${pick?.player_name}`);
+        return { player: pick, top3Players: null, reason: "injury fallback: high-risk active player" };
+      }
+      // Last resort: any active player by rank
+      const lastResort = pool.sort((a, b) => b.rank - a.rank)[0];
+      console.log(`[select] Injury: no eligible injured or high-risk players — using rank fallback → ${lastResort?.player_name ?? "NONE"}`);
+      return { player: lastResort, top3Players: null, reason: "injury fallback: rank fallback" };
     }
 
     const fallback = pickFromTiers(pool.sort((a, b) => b.rank - a.rank));
@@ -601,13 +612,23 @@ function buildWeekPlan(
 
       const primary = top3Players?.[0];
 
-      const resolvedPlayerId = primary?.player_id ?? player?.player_id ?? 0;
-      const resolvedPlayerName = primary?.player_name ?? player?.player_name ?? "";
+      const resolvedPlayerId = primary?.player_id ?? player?.player_id ?? null;
+      const resolvedPlayerName = primary?.player_name ?? player?.player_name ?? null;
       const resolvedTeam = primary?.team ?? player?.team ?? "";
 
-      if (!resolvedPlayerName && cat !== "Top3") {
-        console.warn(`[build] ${config.display} slot ${idx + 1} (${cat}): player_name is empty — plan may have gap`);
+      // SECTION 5 & 7: Validate player before creating post — never allow null player for non-Top3
+      if (cat !== "Top3" && (!resolvedPlayerId || !resolvedPlayerName)) {
+        console.error(`[build] INVALID POST — ${config.display} slot ${idx + 1} (${cat}): missing player. player_id=${resolvedPlayerId}, player_name=${resolvedPlayerName}`);
+        throw new Error(`Invalid post — missing player for ${cat} on ${config.display} slot ${idx + 1}`);
       }
+
+      // SECTION 7: Logging
+      console.log(`[build] Selected player:`, {
+        category: cat,
+        player_id: resolvedPlayerId,
+        player_name: resolvedPlayerName,
+        reason,
+      });
 
       dayResults[idx] = {
         player_id: resolvedPlayerId,
@@ -1064,6 +1085,19 @@ Deno.serve(async (req: Request) => {
       const dayIndex = Math.floor(idx / 3);
       const slot = (idx % 3) + 1;
       const config = DAY_CONFIGS[dayIndex] ?? DAY_CONFIGS[6];
+
+      // SECTION 5: Hard guard — never insert a post without player for non-Top3
+      if (post.category !== "Top3" && (!post.player_id || !post.player_name)) {
+        console.error("[plan-builder] Invalid post — missing player", {
+          category: post.category,
+          player_id: post.player_id,
+          player_name: post.player_name,
+          day: config.label,
+          slot,
+        });
+        throw new Error(`Invalid post — missing player for ${post.category} on ${config.label} slot ${slot}`);
+      }
+
       return {
         weekly_plan_id: planId,
         day_key: config.label,
