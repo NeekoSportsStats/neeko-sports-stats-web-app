@@ -1312,40 +1312,94 @@ export default function AdminContentEngine() {
     setSelectedPostId(prev => prev === updated.id ? updated.id : prev);
   }, []);
 
-  const fetchPlan = useCallback(async (force = false) => {
+  function getCurrentWeekKey(): string {
+    const now = new Date();
+    const day = now.getDay();
+    const diff = now.getDate() - day + (day === 0 ? -6 : 1);
+    const mon = new Date(now);
+    mon.setDate(diff);
+    return mon.toISOString().slice(0, 10);
+  }
+
+  const loadExistingPlan = useCallback(async () => {
     setPlanLoading(true);
     setPlanError(null);
-    console.log("[ContentEngine] Fetching plan — force:", force);
+    try {
+      const wk = getCurrentWeekKey();
+      const { data: plan } = await supabase
+        .from("weekly_content_plans")
+        .select("id, week_key")
+        .eq("week_key", wk)
+        .maybeSingle();
 
+      if (!plan?.id) {
+        setPlanId(null);
+        setWeekKey(wk);
+        setPosts([]);
+        return;
+      }
+
+      const { data: planPosts, error: postsError } = await supabase
+        .from("weekly_content_posts")
+        .select("*")
+        .eq("weekly_plan_id", plan.id)
+        .order("day_number")
+        .order("slot_number");
+
+      if (postsError) throw new Error(postsError.message);
+
+      // Plan exists but has no posts — treat as empty, prompt user to build
+      if (!planPosts || planPosts.length === 0) {
+        setPlanId(null);
+        setWeekKey(wk);
+        setPosts([]);
+        return;
+      }
+
+      setPlanId(plan.id);
+      setWeekKey(plan.week_key ?? wk);
+      setPosts(planPosts as WeeklyContentPost[]);
+      setSelectedPostId(null);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Unknown error loading plan";
+      setPlanError(msg);
+    } finally {
+      setPlanLoading(false);
+    }
+  }, []);
+
+  const fetchPlan = useCallback(async (force = false) => {
+    if (!force) {
+      await loadExistingPlan();
+      return;
+    }
+    setPlanLoading(true);
+    setPlanError(null);
     try {
       const { data, error: fnError } = await supabase.functions.invoke(
         "generate-weekly-content",
-        { body: { force } }
+        { body: { force: true } }
       );
 
       if (fnError) throw new Error(fnError.message ?? "Edge function error");
       if (!data?.plan_id) throw new Error(data?.error ?? "No plan_id returned");
 
-      console.log("[ContentEngine] Plan received:", { plan_id: data.plan_id, posts: data.posts?.length });
-
       setPlanId(data.plan_id);
       setWeekKey(data.week_key ?? "");
       setPosts((data.posts as WeeklyContentPost[]) ?? []);
       setSelectedPostId(null);
-
-      if (force) toast({ title: "New weekly plan built" });
+      toast({ title: "New weekly plan built" });
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Unknown error loading plan";
-      console.error("[ContentEngine] Load failed:", msg);
       setPlanError(msg);
-      toast({ title: "Failed to load plan", description: msg, variant: "destructive" });
+      toast({ title: "Failed to build plan", description: msg, variant: "destructive" });
     } finally {
       setPlanLoading(false);
     }
-  }, [toast]);
+  }, [loadExistingPlan, toast]);
 
   useEffect(() => {
-    fetchPlan(false);
+    loadExistingPlan();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
