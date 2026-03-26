@@ -350,11 +350,13 @@ function buildSystemPrompt(): string {
   return `You are an elite AFL Fantasy strategist, performance marketer, and creative director for Neeko Sports. You produce PREMIUM content — not templates, not patterns, not filler.
 
 CORE PHILOSOPHY:
-- Every post must have a UNIQUE ANGLE derived directly from that player's specific data story.
-- Every post must feel like INSIDER KNOWLEDGE the audience doesn't have yet.
+- Every post must have a UNIQUE ANGLE derived directly from that player's specific data — projection, value_score, ceiling, floor, matchup_label, risk_rating.
+- Every claim must be backed by a real number from the player data provided. No generic takes.
+- Every post must feel like INSIDER KNOWLEDGE — sharp, confident, already-decided analyst voice.
 - Every post creates URGENCY, FEAR OF MISSING OUT, or CONTROVERSY.
 - Content type must match the story — not follow a fixed rotation.
 - No two posts should feel structurally identical.
+- NEVER use: "might", "could", "perhaps", "possibly", "worth watching", "interesting", "solid pick", "good option", "one to watch".
 
 CONTENT TYPES:
 - "Short-form Video" — face/voiceover, 15-30s, opinion-led, one strong take
@@ -417,9 +419,12 @@ CONVERSATION POST RULES:
 - Visual: Bold text post. One question as hero. Simple clean background.
 
 PROOF POST RULES:
-- Must use ACTUAL past performance data — real scores vs real projections.
-- Voice: "We projected [Player] at [X] pts last round — they scored [Y] pts. That's [gap] pts off. The model works."
-- Visual: Screen recording or graphic showing projected vs actual score side by side.
+- Must use ACTUAL past performance data from the AI INTEL section — real projected score vs real actual score.
+- The gap between projected and actual MUST be stated explicitly (e.g. "2pts off", "0.5pts off").
+- Voice MUST follow this exact format: "We projected [Player] at [projected]pts last round — they scored [actual]pts. That's [gap]pts off. The model works."
+- Do NOT use vague language like "close to" or "near the projection" — use exact numbers only.
+- Visual: Scoreboard or split graphic — projected score left, actual score right, gap in the middle. Green tick overlay. Neeko Sports logo bottom-right.
+- Hook must include the actual score number. E.g. "We said 93pts. He scored 94. That's the model."
 
 VOICE SCRIPT RULES (non-Top3):
 - 55-80 words. Hook → Setup → Data pivot → Strong take → CTA (Neeko Sports link in bio).
@@ -501,7 +506,7 @@ function buildUserPrompt(
   post: PostRow,
   player: PlayerCache | null,
   player2: PlayerCache | null,
-  aiSummary: string | null,
+  aiSummary: string,
 ): string {
   const priceStr = player ? `$${Math.round((player.price ?? 0) / 1000)}k` : "unknown";
   const priceChange = player && player.price_change !== 0
@@ -541,18 +546,16 @@ Captain Score: ${Math.round(player2.captain_score)}
 Consistency: ${Math.round(player2.consistency)}%`
     : "";
 
-  const aiSummarySection = aiSummary
-    ? `\nAI ANALYSIS FOR ${post.player_name}:\n${aiSummary.slice(0, 500)}`
-    : "";
+  const aiSummarySection = `\nAI INTEL FOR ${post.player_name}:\n${aiSummary.slice(0, 600)}`;
 
   const categoryInstructions: Record<string, string> = {
-    Value: "This is a VALUE post. Highlight why this player is priced below their true output potential. Make the audience feel like they are getting insider edge before the market reacts.",
-    Breakout: "This is a BREAKOUT post. This player is trending up fast. Make the audience feel urgency — act before the price rises and the opportunity closes.",
-    Trap: "This is a TRAP post. This player is popular but dangerously overpriced for their projected output. Warn the audience before they make a costly mistake.",
-    Captain: "This is a CAPTAIN post. This player is the elite captain pick this round. The data is decisive — lock them in.",
-    Proof: "This is a PROOF post. Use the player's actual vs projected scores to demonstrate Neeko's model accuracy. Build credibility. Show the model works.",
+    Value: "This is a VALUE post. The player's value_score and best_value_score show they are underpriced for their projected output. Reference their exact price, projection, and value_score in the content. Make the audience feel they are getting insider edge before the market adjusts.",
+    Breakout: "This is a BREAKOUT post. Reference the player's upside_pct and ceiling to show explosive scoring potential. The price has not caught up yet. Make the audience feel urgency — act before the price rises and the window closes.",
+    Trap: "This is a TRAP post. The player's risk_rating is high and value_score is low — they are overpriced for their projected output. Reference their exact price and risk_rating. Warn the audience before they make a costly mistake.",
+    Captain: "This is a CAPTAIN post. This player has the highest captain_score and projection in the pool. The data is decisive — reference their projection, ceiling, and consistency. Lock them in.",
+    Proof: "This is a PROOF post. The model called this. Show the actual score vs the projected score — the gap must be ≤5pts. Voice script MUST say: 'We projected [Player] at [projected]pts last round — they scored [actual]pts. That's [gap]pts off. The model works.' Build credibility with real numbers. No waffle.",
     H2H: "This is a HEAD-TO-HEAD debate post. Force the audience to choose between the two players. No neutral answer allowed. Every element drives comments.",
-    Injury: "This is an INJURY ALERT post. Create urgency around a replacement opportunity. Give 3 clear alternatives with projections and prices.",
+    Injury: "This is an INJURY ALERT post. Player status is INJURED — do NOT list them as a pick. Create urgency: who replaces them? Give 3 clear replacement options with projections and prices. Urgent breaking-news tone.",
     Conversation: "This is a CONVERSATION post. Ask a sharp question or run a poll. No player stats needed. Drive comment engagement above all else.",
     Engagement: "This is an ENGAGEMENT post. Ask a sharp question, run a poll, or spark a debate. Pick a controversial topic in AFL Fantasy. Drive comments above all else.",
   };
@@ -1096,7 +1099,7 @@ Deno.serve(async (req: Request) => {
       player2Data = pd2 ?? null;
     }
 
-    let aiSummary: string | null = null;
+    let aiSummary: string = "No AI analysis available yet.";
     if (typedPost.player_id) {
       const { data: aiRow } = await aiDb
         .from("player_ai_analysis")
@@ -1106,9 +1109,8 @@ Deno.serve(async (req: Request) => {
         .limit(1)
         .maybeSingle();
       if (aiRow) {
-        aiSummary = [aiRow.summary_long, aiRow.summary_short, aiRow.recommendation]
-          .filter(Boolean)
-          .join("\n");
+        const parts = [aiRow.summary_long, aiRow.summary_short, aiRow.recommendation].filter(Boolean);
+        if (parts.length > 0) aiSummary = parts.join("\n");
       }
     }
 

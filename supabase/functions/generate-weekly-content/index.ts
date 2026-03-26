@@ -32,6 +32,7 @@ interface PlayerData {
   recommendation_short: string;
   market_watch_category: string;
   games_played: number;
+  player_status: string;
 }
 
 interface Top3Player {
@@ -388,9 +389,17 @@ function buildWeekPlan(
       return { player: trapPool[0] ?? rankPool[0], top3Players: null };
     }
 
-    if (cat === "Engagement" || cat === "Conversation" || cat === "Injury") {
+    if (cat === "Engagement" || cat === "Conversation") {
       const rankPool = dayAvailable().sort((a, b) => b.rank - a.rank);
       return { player: rankPool[0], top3Players: null };
+    }
+
+    if (cat === "Injury") {
+      const injuredPool = dayAvailable()
+        .filter(p => p.player_status === "INJURED")
+        .sort((a, b) => b.rank - a.rank);
+      if (injuredPool.length > 0) return { player: injuredPool[0], top3Players: null };
+      return { player: undefined, top3Players: null };
     }
 
     const rankPool = dayAvailable().sort((a, b) => b.rank - a.rank);
@@ -576,7 +585,9 @@ Deno.serve(async (req: Request) => {
         .from("player_rankings_cache")
         .select("player_id, player_name, team, position, projection_final, neeko_rating_scaled")
         .eq("is_available", true)
+        .eq("is_bye", false)
         .not("projection_final", "is", null)
+        .not("manual_status", "in", '("RETIRED","DELISTED","BYE")')
         .order("projection_final", { ascending: false, nullsFirst: false })
         .limit(80);
       if (error) throw new Error(error.message);
@@ -716,10 +727,13 @@ Deno.serve(async (req: Request) => {
         projection_final, ceiling, floor, price, prev_price, price_change,
         value_score, best_value_score, neeko_rating_scaled, form_score, consistency,
         captain_score, risk_rating, upside_pct, matchup_label, signal,
-        ai_recommendation, recommendation_short, market_watch_category, games_played
+        ai_recommendation, recommendation_short, market_watch_category, games_played,
+        is_bye, manual_status, status
       `)
       .eq("is_available", true)
+      .eq("is_bye", false)
       .not("projection_final", "is", null)
+      .not("manual_status", "in", '("RETIRED","DELISTED","BYE")')
       .order("neeko_rating_scaled", { ascending: false })
       .limit(80);
 
@@ -753,38 +767,44 @@ Deno.serve(async (req: Request) => {
       recommendation_short: p.recommendation_short ?? "",
       market_watch_category: p.market_watch_category ?? "",
       games_played: Number(p.games_played ?? 0),
+      player_status: p.status ?? "",
     }));
 
     console.log(
       `[plan-builder] Mapped ${mappedPlayers.length} players. Top: ${mappedPlayers[0]?.player_name ?? "none"}`,
     );
 
-    const { data: latestRound } = await db.rpc("get_latest_completed_round");
-    const roundNum = Number(latestRound ?? 0);
+    const lastRoundResult = await db.rpc("get_latest_completed_round");
+    const roundNum = Number(lastRoundResult.data ?? 0);
 
     let proofPlayers: ProofPlayer[] = [];
     if (roundNum > 0) {
-      const { data: proofRaw } = await aflDb
-        .from("player_games")
-        .select("player_id, player_name, team, fantasy_score, projection_final")
-        .eq("round", roundNum)
+      const { data: proofRaw } = await db
+        .from("projection_accuracy")
+        .select("player_id, actual_score, projected_score, abs_error, round_number, round_label")
         .eq("season", 2026)
-        .not("fantasy_score", "is", null)
-        .not("projection_final", "is", null)
-        .gt("fantasy_score", 0)
-        .gt("projection_final", 0)
+        .eq("round_number", roundNum)
+        .not("actual_score", "is", null)
+        .not("abs_error", "is", null)
+        .lte("abs_error", 5)
+        .order("abs_error", { ascending: true })
         .limit(30);
 
+      const eligiblePlayerIds = new Set(mappedPlayers.map(p => p.player_id));
+
       proofPlayers = (proofRaw ?? [])
-        .map(p => ({
-          player_id: Number(p.player_id),
-          player_name: p.player_name ?? "",
-          team: p.team ?? "",
-          fantasy_score: Number(p.fantasy_score),
-          projection_final: Number(p.projection_final),
-          accuracy_gap: Math.abs(Number(p.fantasy_score) - Number(p.projection_final)),
-        }))
-        .filter(p => p.accuracy_gap <= 10)
+        .filter(p => eligiblePlayerIds.has(Number(p.player_id)))
+        .map(p => {
+          const cached = mappedPlayers.find(m => m.player_id === Number(p.player_id));
+          return {
+            player_id: Number(p.player_id),
+            player_name: cached?.player_name ?? String(p.player_id),
+            team: cached?.team ?? "",
+            fantasy_score: Number(p.actual_score),
+            projection_final: Number(p.projected_score),
+            accuracy_gap: Number(p.abs_error),
+          };
+        })
         .sort((a, b) => a.accuracy_gap - b.accuracy_gap)
         .slice(0, 5);
     }
