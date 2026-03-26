@@ -246,7 +246,12 @@ function selectTop3Players(
   pool: PlayerData[],
   globalUsedIds: Set<number>,
 ): Top3Player[] {
-  const available = hardFilter(pool.filter(p => !globalUsedIds.has(p.player_id)));
+  // Try fresh players first; fall back to full pool if not enough
+  let available = hardFilter(pool.filter(p => !globalUsedIds.has(p.player_id)));
+  if (available.length < 3) {
+    console.warn(`[top3] Only ${available.length} fresh players — relaxing to full pool`);
+    available = hardFilter(pool);
+  }
 
   const sorted = [...available].sort((a, b) => {
     if (b.projection !== a.projection) return b.projection - a.projection;

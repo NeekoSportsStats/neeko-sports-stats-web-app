@@ -546,7 +546,7 @@ Captain Score: ${Math.round(player2.captain_score)}
 Consistency: ${Math.round(player2.consistency)}%`
     : "";
 
-  const aiSummarySection = `\nAI INTEL FOR ${post.player_name ?? playerName}:\n${aiSummary.slice(0, 600)}`;
+  const aiSummarySection = aiSummary ? `\nAI INTEL FOR ${post.player_name ?? ""}:\n${aiSummary.slice(0, 600)}` : "";
 
   const categoryInstructions: Record<string, string> = {
     Value: "This is a VALUE post. The player's value_score and best_value_score show they are underpriced for their projected output. Reference their exact price, projection, and value_score in the content. Make the audience feel they are getting insider edge before the market adjusts.",
@@ -974,9 +974,21 @@ Deno.serve(async (req: Request) => {
     });
 
     const isTop3 = typedPost.category === "Top3";
-    const top3Players = isTop3 && Array.isArray(typedPost.top3_players) && typedPost.top3_players.length >= 3
+    const top3Players = isTop3 && Array.isArray(typedPost.top3_players) && (typedPost.top3_players as Top3Player[]).length >= 3
       ? typedPost.top3_players as Top3Player[]
       : null;
+
+    if (isTop3 && !top3Players) {
+      console.error(`[generate-content-post] Top3 post ${postId} has invalid top3_players (null or < 3 entries) — cannot generate`);
+      await db
+        .from("weekly_content_posts")
+        .update({ status: "error", error_message: "Top3 post missing valid top3_players array (need >= 3 players)", updated_at: new Date().toISOString() })
+        .eq("id", postId);
+      return new Response(
+        JSON.stringify({ error: "Top3 post missing valid top3_players array", post_id: postId }),
+        { status: 422, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
 
     const category = typedPost.category;
 
