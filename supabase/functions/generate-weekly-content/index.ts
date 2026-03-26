@@ -350,11 +350,30 @@ function buildWeekPlan(
     );
   }
 
+  // SECTION 2: Pool relaxation — if pool is too small, fall back progressively
+  function relaxedPool(dayUsedIds: Set<number>): PlayerData[] {
+    const primary = dayAvailablePool(dayUsedIds);
+    if (primary.length >= 10) return primary;
+    console.warn(`[pool-relax] Primary pool too small (${primary.length}), ignoring usage tracking`);
+    const withoutUsage = hardFilter(safePlayers.filter(p => !dayUsedIds.has(p.player_id)));
+    if (withoutUsage.length >= 5) return withoutUsage;
+    console.warn(`[pool-relax] Still too small (${withoutUsage.length}), expanding to full active list`);
+    return hardFilter(safePlayers);
+  }
+
+  // SECTION 1: Guaranteed fallback player — never returns null if safePlayers is non-empty
+  function guaranteedFallback(dayUsedIds: Set<number>, reason: string): PlayerData {
+    const pool = relaxedPool(dayUsedIds);
+    const pick = pool.sort((a, b) => b.rank - a.rank)[0] ?? safePlayers[0];
+    console.warn(`[fallback] No player found for ${reason} — using fallback: ${pick?.player_name ?? "NONE"}`);
+    return pick;
+  }
+
   function selectPlayerForCategory(
     cat: Category,
     dayUsedIds: Set<number>,
   ): { player: PlayerData | undefined; top3Players: Top3Player[] | null; reason: string } {
-    const pool = dayAvailablePool(dayUsedIds);
+    const pool = relaxedPool(dayUsedIds);
 
     if (cat === "Top3") {
       const top3 = selectTop3Players(safePlayers, globalUsedIds);
@@ -561,12 +580,10 @@ function buildWeekPlan(
         }
       }
 
+      // SECTION 1: NEVER allow null player — guaranteed fallback for all non-Top3 slots
       if (!player && cat !== "Top3") {
-        const rankPool = hardFilter(
-          safePlayers.filter(p => !globalUsedIds.has(p.player_id) && !dayUsedIds.has(p.player_id))
-        ).sort((a, b) => b.rank - a.rank);
-        player = rankPool[0] ?? safePlayers[0];
-        console.log(`[build] Last-resort fallback → ${player?.player_name ?? "none"}`);
+        player = guaranteedFallback(dayUsedIds, cat);
+        console.warn(`[build] Last-resort fallback used → ${player?.player_name ?? "NONE"}`);
       }
 
       // Mark used
@@ -584,10 +601,18 @@ function buildWeekPlan(
 
       const primary = top3Players?.[0];
 
+      const resolvedPlayerId = primary?.player_id ?? player?.player_id ?? 0;
+      const resolvedPlayerName = primary?.player_name ?? player?.player_name ?? "";
+      const resolvedTeam = primary?.team ?? player?.team ?? "";
+
+      if (!resolvedPlayerName && cat !== "Top3") {
+        console.warn(`[build] ${config.display} slot ${idx + 1} (${cat}): player_name is empty — plan may have gap`);
+      }
+
       dayResults[idx] = {
-        player_id: primary?.player_id ?? player?.player_id ?? 0,
-        player_name: primary?.player_name ?? player?.player_name ?? "TBD",
-        team: primary?.team ?? player?.team ?? "TBD",
+        player_id: resolvedPlayerId,
+        player_name: resolvedPlayerName,
+        team: resolvedTeam,
         category: cat,
         angle,
         content_type,
@@ -642,18 +667,23 @@ function validateAndFixPlan(
 
   if (posts.length < 21) {
     const fillPlayer = players[0];
-    while (posts.length < 21) {
-      posts.push({
-        player_id: fillPlayer?.player_id ?? 0,
-        player_name: fillPlayer?.player_name ?? "TBD",
-        team: fillPlayer?.team ?? "TBD",
-        category: "Value",
-        angle: "hidden_edge",
-        content_type: "Graphic Post",
-        player2_id: null,
-        player2_name: null,
-        top3_players: null,
-      });
+    if (!fillPlayer) {
+      console.warn(`[validate] No fill player available — cannot pad to 21 posts`);
+    } else {
+      while (posts.length < 21) {
+        console.warn(`[validate] Padding plan to 21 posts with ${fillPlayer.player_name}`);
+        posts.push({
+          player_id: fillPlayer.player_id,
+          player_name: fillPlayer.player_name,
+          team: fillPlayer.team,
+          category: "Value",
+          angle: "hidden_edge",
+          content_type: "Graphic Post",
+          player2_id: null,
+          player2_name: null,
+          top3_players: null,
+        });
+      }
     }
   }
 

@@ -532,7 +532,7 @@ Signal: ${player.signal ?? "n/a"}
 Market Category: ${player.market_watch_category ?? "n/a"}
 Games Played: ${player.games_played}
 AI Short Take: ${player.recommendation_short ?? "n/a"}`
-    : `Player: ${post.player_name ?? "Unknown"} (${post.team ?? "Unknown"})
+    : `Player: ${post.player_name ?? ""} (${post.team ?? ""})
 No additional stats available.`;
 
   const player2Info = player2
@@ -546,7 +546,7 @@ Captain Score: ${Math.round(player2.captain_score)}
 Consistency: ${Math.round(player2.consistency)}%`
     : "";
 
-  const aiSummarySection = `\nAI INTEL FOR ${post.player_name}:\n${aiSummary.slice(0, 600)}`;
+  const aiSummarySection = `\nAI INTEL FOR ${post.player_name ?? playerName}:\n${aiSummary.slice(0, 600)}`;
 
   const categoryInstructions: Record<string, string> = {
     Value: "This is a VALUE post. The player's value_score and best_value_score show they are underpriced for their projected output. Reference their exact price, projection, and value_score in the content. Make the audience feel they are getting insider edge before the market adjusts.",
@@ -586,9 +586,9 @@ OUTPUT FORMAT (strict JSON, no markdown):
   "content_angle": "${post.angle ?? "hidden_edge"}",
   "angle_label": "Value Edge",
   "creative_style": "data_graphic",
-  "player_name": "${post.player_name ?? ""}",
+  "player_name": "${player?.player_name ?? post.player_name ?? ""}",
   "player_id": ${post.player_id ?? 0},
-  "team": "${post.team ?? ""}",
+  "team": "${player?.team ?? post.team ?? ""}",
   "player2_name": ${post.player2_name ? `"${post.player2_name}"` : "null"},
   "player2_id": ${post.player2_id ?? "null"},
   "hooks": ["hook 1 under 20 words", "hook 2 under 20 words", "hook 3 under 20 words"],
@@ -956,9 +956,24 @@ Deno.serve(async (req: Request) => {
       ? typedPost.top3_players as Top3Player[]
       : null;
 
-    const playerName = typedPost.player_name ?? "Unknown";
     const category = typedPost.category ?? "Value";
-    const team = typedPost.team ?? "Unknown";
+
+    // SECTION 3 & 5: Unified contentPayload — single source of truth, never TBD/Unknown
+    // If player_name is missing, we cannot generate meaningful content — abort with error
+    if (!isTop3 && (!typedPost.player_name || typedPost.player_name.trim() === "" || typedPost.player_name === "TBD")) {
+      console.error(`[generate-content-post] Post ${postId} has no valid player_name — cannot generate`);
+      await db
+        .from("weekly_content_posts")
+        .update({ status: "error", error_message: "No valid player assigned to this post", updated_at: new Date().toISOString() })
+        .eq("id", postId);
+      return new Response(
+        JSON.stringify({ error: "No valid player assigned to this post", post_id: postId }),
+        { status: 422, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
+    const playerName = typedPost.player_name ?? "";
+    const team = typedPost.team ?? "";
 
     const apiKey = Deno.env.get("OPENAI_API_KEY");
 
