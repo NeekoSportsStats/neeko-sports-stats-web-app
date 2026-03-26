@@ -967,7 +967,7 @@ Deno.serve(async (req: Request) => {
       db: { schema: "afl" },
     });
 
-    // Fetch active player pool — filtered at DB level, then again in hardFilter()
+    // Fetch active player pool — simple filters only
     const { data: rawPlayers, error: playersError } = await aflDb
       .from("player_rankings_cache")
       .select(`
@@ -981,13 +981,10 @@ Deno.serve(async (req: Request) => {
       .eq("is_available", true)
       .eq("is_bye", false)
       .not("projection_final", "is", null)
-      .not("manual_status", "in", '("RETIRED","DELISTED","BYE")')
       .order("neeko_rating_scaled", { ascending: false })
       .limit(150);
 
-    // SECTION 2 & 3: Injured player fetch
-    // status=OUT, is_bye=false, not retired/delisted
-    // played_last_game derived from games_played > 0 (proxy: if they have recent games)
+    // Injured player fetch — simple filters
     const { data: rawInjured } = await aflDb
       .from("player_rankings_cache")
       .select(`
@@ -1001,7 +998,6 @@ Deno.serve(async (req: Request) => {
       .eq("is_available", false)
       .eq("is_bye", false)
       .eq("status", "OUT")
-      .not("manual_status", "in", '("RETIRED","DELISTED","BYE")')
       .not("projection_final", "is", null)
       .order("neeko_rating_scaled", { ascending: false })
       .limit(30);
@@ -1064,58 +1060,11 @@ Deno.serve(async (req: Request) => {
       `Injured with played_last_game=true: ${mappedInjured.filter(p => p.played_last_game).length}`,
     );
 
-    // Load recently used player IDs (past 3 days) to avoid repeats across rebuilds
-    const threeDaysAgo = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString();
-    const { data: recentUsage } = await db
-      .from("content_player_usage")
-      .select("player_id")
-      .gte("used_at", threeDaysAgo);
-    const recentlyUsedIds = new Set<number>((recentUsage ?? []).map((r: { player_id: number }) => r.player_id));
-
-    const freshPlayers = mappedPlayers.filter(p => !recentlyUsedIds.has(p.player_id));
-    const selectionPool = freshPlayers.length >= 30 ? freshPlayers : mappedPlayers;
+    const selectionPool = mappedPlayers;
+    const proofPlayers: ProofPlayer[] = [];
 
     console.log(
-      `[plan-builder] Fresh (not used in 3d): ${freshPlayers.length}. Using pool of ${selectionPool.length}.`,
-    );
-
-    const lastRoundResult = await db.rpc("get_latest_completed_round");
-    const roundNum = Number(lastRoundResult.data ?? 0);
-
-    let proofPlayers: ProofPlayer[] = [];
-    if (roundNum > 0) {
-      const { data: proofRaw } = await db
-        .from("projection_accuracy")
-        .select("player_id, actual_score, projected_score, abs_error, round_number, round_label")
-        .eq("season", 2026)
-        .eq("round_number", roundNum)
-        .not("actual_score", "is", null)
-        .not("abs_error", "is", null)
-        .lte("abs_error", 5)
-        .order("abs_error", { ascending: true })
-        .limit(30);
-
-      const eligiblePlayerIds = new Set(mappedPlayers.map(p => p.player_id));
-
-      proofPlayers = (proofRaw ?? [])
-        .filter(p => eligiblePlayerIds.has(Number(p.player_id)))
-        .map(p => {
-          const cached = mappedPlayers.find(m => m.player_id === Number(p.player_id));
-          return {
-            player_id: Number(p.player_id),
-            player_name: cached?.player_name ?? String(p.player_id),
-            team: cached?.team ?? "",
-            fantasy_score: Number(p.actual_score),
-            projection_final: Number(p.projected_score),
-            accuracy_gap: Number(p.abs_error),
-          };
-        })
-        .sort((a, b) => a.accuracy_gap - b.accuracy_gap)
-        .slice(0, 5);
-    }
-
-    console.log(
-      `[plan-builder] Pool=${selectionPool.length}, injured=${mappedInjured.length}, proof=${proofPlayers.length}, round=${roundNum}`,
+      `[plan-builder] Pool=${selectionPool.length}, injured=${mappedInjured.length}`,
     );
 
     const { data: existingPlan } = await db
