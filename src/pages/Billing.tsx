@@ -37,11 +37,11 @@ const Billing = () => {
       // Resolve the stripe customer for this user
       const { data: customer } = await supabase
         .from("stripe_customers")
-        .select("customer_id, stripe_id")
-        .or(`profile_id.eq.${user?.id},user_id.eq.${user?.id}`)
+        .select("customer_id")
+        .eq("user_id", user?.id)
         .maybeSingle();
 
-      const customerId = customer?.customer_id || customer?.stripe_id;
+      const customerId = customer?.customer_id;
 
       if (!customerId) {
         setSubscription(null);
