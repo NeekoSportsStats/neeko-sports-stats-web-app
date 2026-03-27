@@ -185,6 +185,7 @@ async function syncCustomerFromStripe(customerId: string) {
     .upsert(
       {
         id: userId,
+        is_premium: isActive,
         is_active: isActive,
         plan: isActive ? 'premium' : 'free',
         stripe_customer_id: customerId,
@@ -200,7 +201,7 @@ async function syncCustomerFromStripe(customerId: string) {
   if (profileError) {
     console.error('profiles upsert error:', profileError);
   } else {
-    console.log(`profiles upserted: user=${userId}, is_active=${isActive}, plan=${isActive ? 'premium' : 'free'}`);
+    console.log(`profiles upserted: user=${userId}, is_premium=${isActive}, is_active=${isActive}, plan=${isActive ? 'premium' : 'free'}`);
   }
 
   const { error: subTableError } = await supabase.from('subscriptions').upsert(
@@ -243,6 +244,7 @@ async function deactivateProfile(userId: string, customerId: string) {
   const { error } = await supabase
     .from('profiles')
     .update({
+      is_premium: false,
       is_active: false,
       plan: 'free',
       subscription_status: 'canceled',
@@ -285,14 +287,25 @@ async function trackAnalyticsEvent(
 async function resolveUserId(customerId: string): Promise<string | null> {
   const { data, error } = await supabase
     .from('stripe_customers')
-    .select('user_id, profile_id')
-    .or(`customer_id.eq.${customerId},stripe_id.eq.${customerId}`)
+    .select('user_id')
+    .eq('customer_id', customerId)
     .maybeSingle();
 
   if (error) {
     console.error('resolveUserId query error:', error);
-    return null;
   }
 
-  return data?.user_id ?? data?.profile_id ?? null;
+  if (data?.user_id) return data.user_id;
+
+  const { data: profileData, error: profileError } = await supabase
+    .from('profiles')
+    .select('id')
+    .eq('stripe_customer_id', customerId)
+    .maybeSingle();
+
+  if (profileError) {
+    console.error('resolveUserId profiles fallback error:', profileError);
+  }
+
+  return profileData?.id ?? null;
 }

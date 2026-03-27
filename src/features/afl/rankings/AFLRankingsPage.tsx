@@ -681,7 +681,7 @@ export default function AFLRankingsPage() {
 
         <div className="md:hidden">
           <MobileRankingsTable
-            rows={displayRows}
+            rows={isPremium ? sortedRows : sortedRows.slice(0, FREE_PARTIAL_ROWS)}
             loading={loading}
             isPremium={isPremium}
             activeTab={activeTab}

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Lock, Crown, ChevronRight } from "lucide-react";
 import { RankingRow, RankingsTab, RowTier } from "./types";
 import {
@@ -364,7 +364,8 @@ interface MobileRankingsTableProps {
   onUpgrade: () => void;
 }
 
-const SHOW_MORE_STEP = 25;
+const SHOW_MORE_INITIAL = 50;
+const SHOW_MORE_STEP = 50;
 
 export function MobileRankingsTable({
   rows,
@@ -374,10 +375,17 @@ export function MobileRankingsTable({
   onOpenRow,
   onUpgrade,
 }: MobileRankingsTableProps) {
-  const initialCount = isPremium ? 100 : 25;
-  const [visibleCount, setVisibleCount] = useState(initialCount);
+  const [visibleCount, setVisibleCount] = useState(SHOW_MORE_INITIAL);
 
-  const visibleRows = rows.slice(0, isPremium ? visibleCount : Math.min(visibleCount, FREE_PARTIAL_ROWS));
+  // Reset visible count whenever the dataset changes (tab/filter change)
+  useEffect(() => {
+    setVisibleCount(SHOW_MORE_INITIAL);
+  }, [rows]);
+
+  const visibleRows = isPremium
+    ? rows.slice(0, visibleCount)
+    : rows.slice(0, FREE_PARTIAL_ROWS);
+
   const hasMore = isPremium && visibleCount < rows.length;
 
   return (
@@ -418,11 +426,17 @@ export function MobileRankingsTable({
       {!loading && hasMore && (
         <div className="px-4 pt-3">
           <button
-            onClick={() => setVisibleCount((c) => c + SHOW_MORE_STEP)}
-            className="w-full py-3 rounded-xl border border-white/10 text-xs font-semibold text-white/50 hover:border-white/20 hover:text-white/70 transition-all"
+            onClick={() => setVisibleCount((c) => Math.min(c + SHOW_MORE_STEP, rows.length))}
+            className="w-full py-3 rounded-xl border border-white/10 text-xs font-semibold text-white/50 hover:border-white/20 hover:text-white/70 active:bg-white/[0.03] transition-all"
           >
-            Show More Players ({rows.length - visibleCount} remaining)
+            Show More ({visibleRows.length} of {rows.length} players)
           </button>
+        </div>
+      )}
+
+      {!loading && isPremium && !hasMore && rows.length > SHOW_MORE_INITIAL && (
+        <div className="px-4 pt-3 pb-1">
+          <p className="text-center text-[11px] text-white/25">All {rows.length} players loaded</p>
         </div>
       )}
 

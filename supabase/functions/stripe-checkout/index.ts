@@ -207,12 +207,9 @@ Deno.serve(async (req) => {
       mode: 'subscription',
       payment_method_types: ['card'],
       line_items: [{ price: price_id, quantity: 1 }],
-      success_url,
+      success_url: `${success_url}?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url,
       payment_method_collection: 'always',
-
-      receipt_email: user.email,
-
       metadata: {
         supabase_user_id: user.id,
         email: user.email,

@@ -9,9 +9,12 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { CheckCircle2, Crown, ArrowRight, Loader2, Home } from "lucide-react";
+import { CircleCheck as CheckCircle2, Crown, ArrowRight, Loader as Loader2, Chrome as Home } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { supabase } from "@/lib/supabaseClient";
+
+const POLL_INTERVAL_MS = 2000;
+const POLL_MAX_ATTEMPTS = 10;
 
 export default function Success() {
   const [params] = useSearchParams();
@@ -19,13 +22,14 @@ export default function Success() {
 
   const { loading, isPremium, refreshPremiumStatus, user } = useAuth();
   const refreshTriggeredRef = useRef(false);
+  const pollCountRef = useRef(0);
+  const pollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [authTimedOut, setAuthTimedOut] = useState(false);
+  const [polling, setPolling] = useState(false);
 
-  // Safety escape: if auth is still loading after 4s, stop blocking the page
   useEffect(() => {
     const t = setTimeout(() => {
       if (loading) {
-        console.warn("⚠️ Success page: auth loading timeout — unblocking");
         setAuthTimedOut(true);
       }
     }, 4000);
@@ -42,13 +46,45 @@ export default function Success() {
 
     track("subscription_started", { session_id: sessionId ?? undefined });
 
-    supabase.auth.refreshSession()
-      .then(() => refreshPremiumStatus())
-      .catch((e) => {
-        console.error("❌ Session/premium refresh error on Success page:", e);
-        refreshPremiumStatus().catch(() => {});
-      });
+    const startPolling = async () => {
+      setPolling(true);
+
+      await supabase.auth.refreshSession().catch(() => {});
+      await refreshPremiumStatus().catch(() => {});
+
+      const poll = async () => {
+        if (pollCountRef.current >= POLL_MAX_ATTEMPTS) {
+          setPolling(false);
+          return;
+        }
+        pollCountRef.current += 1;
+        await refreshPremiumStatus().catch(() => {});
+
+        const { data } = await supabase.rpc("get_access_state").catch(() => ({ data: null }));
+        if (data?.is_premium === true) {
+          setPolling(false);
+          return;
+        }
+
+        pollTimerRef.current = setTimeout(poll, POLL_INTERVAL_MS);
+      };
+
+      pollTimerRef.current = setTimeout(poll, POLL_INTERVAL_MS);
+    };
+
+    startPolling();
+
+    return () => {
+      if (pollTimerRef.current) clearTimeout(pollTimerRef.current);
+    };
   }, [loading, authTimedOut, user, refreshPremiumStatus, sessionId]);
+
+  useEffect(() => {
+    if (isPremium && pollTimerRef.current) {
+      clearTimeout(pollTimerRef.current);
+      setPolling(false);
+    }
+  }, [isPremium]);
 
   if (loading && !authTimedOut) {
     return (
@@ -57,12 +93,8 @@ export default function Success() {
           <CardContent className="py-12">
             <div className="text-center space-y-4">
               <Loader2 className="h-12 w-12 animate-spin text-primary mx-auto" />
-              <p className="text-lg text-muted-foreground">
-                Loading your account...
-              </p>
-              <p className="text-sm text-muted-foreground">
-                Verifying your subscription
-              </p>
+              <p className="text-lg text-muted-foreground">Loading your account...</p>
+              <p className="text-sm text-muted-foreground">Verifying your subscription</p>
             </div>
           </CardContent>
         </Card>
@@ -77,12 +109,8 @@ export default function Success() {
           <div className="mx-auto w-16 h-16 bg-green-100 dark:bg-green-900 rounded-full flex items-center justify-center">
             <CheckCircle2 className="w-10 h-10 text-green-600 dark:text-green-400" />
           </div>
-          <CardTitle className="text-3xl font-bold">
-            Payment Successful!
-          </CardTitle>
-          <CardDescription className="text-lg">
-            Welcome to Neeko+ Premium
-          </CardDescription>
+          <CardTitle className="text-3xl font-bold">Payment Successful!</CardTitle>
+          <CardDescription className="text-lg">Welcome to Neeko+ Premium</CardDescription>
         </CardHeader>
 
         <CardContent className="space-y-6">
@@ -90,28 +118,32 @@ export default function Success() {
             <div className="flex items-center gap-2">
               <Crown className="h-5 w-5 text-primary" />
               <h3 className="font-semibold">
-                {isPremium
-                  ? "Your Premium Access is Active"
-                  : "Your Premium Access is Almost Ready"}
+                {isPremium ? "Your Premium Access is Active" : "Activating your Premium Access..."}
               </h3>
             </div>
             <p className="text-sm text-muted-foreground">
-              You now have unlimited access to all AI-powered insights,
-              advanced analytics, and premium features across AFL, EPL, and
-              NBA.
+              You now have unlimited access to all AI-powered insights, advanced analytics, and
+              premium features.
             </p>
           </div>
 
           {isPremium ? (
             <div className="bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 rounded-lg p-4">
               <p className="text-sm text-green-900 dark:text-green-100 font-medium">
-                ✓ Subscription verified successfully
+                Subscription verified successfully
+              </p>
+            </div>
+          ) : polling ? (
+            <div className="bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 rounded-lg p-4 flex items-center gap-3">
+              <Loader2 className="h-4 w-4 animate-spin text-amber-600 dark:text-amber-400 shrink-0" />
+              <p className="text-sm text-amber-900 dark:text-amber-100 font-medium">
+                Payment received — activating your subscription...
               </p>
             </div>
           ) : (
             <div className="bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 rounded-lg p-4">
               <p className="text-sm text-amber-900 dark:text-amber-100 font-medium">
-                Payment received! Your subscription will be active shortly.
+                Payment received! Your subscription will be active within a minute.
               </p>
             </div>
           )}
