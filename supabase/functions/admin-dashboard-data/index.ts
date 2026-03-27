@@ -59,10 +59,10 @@ Deno.serve(async (req: Request) => {
     const section = body?.section ?? "all";
 
     const db = createClient(supabaseUrl, serviceKey);
-    const adminDb = createClient(supabaseUrl, serviceKey, { db: { schema: "admin" as never } });
 
     const result: Record<string, unknown> = {};
 
+    // ── STATUS (pipeline / health views — may not exist on all envs) ─────────
     if (section === "all" || section === "status") {
       const [statusRes, runsRes] = await Promise.allSettled([
         db.from("v_command_center_status").select("*").maybeSingle(),
@@ -72,94 +72,49 @@ Deno.serve(async (req: Request) => {
       result.pipeline_runs = runsRes.status === "fulfilled" ? (runsRes.value.data ?? []) : [];
     }
 
-    if (section === "all" || section === "analytics_usage") {
-      const [res24h, res7d, uvRes, liveRes, mauRes, pagesRes, funnelRes, mwRes, adRes] = await Promise.allSettled([
-        db.from("v_admin_analytics_summary").select("*").maybeSingle(),
-        db.from("v_admin_analytics_7d").select("*").maybeSingle(),
-        adminDb.from("v_unique_visitors_24h" as never).select("*").maybeSingle(),
-        adminDb.from("v_live_users" as never).select("*").maybeSingle(),
-        adminDb.from("v_mau" as never).select("*").maybeSingle(),
-        adminDb.from("v_top_pages_7d" as never).select("*").limit(20),
-        adminDb.from("v_conversion_funnel_30d" as never).select("*").maybeSingle(),
-        adminDb.from("v_market_watch_usage_7d" as never).select("*").maybeSingle(),
-        adminDb.from("v_analytics_daily" as never).select("*").limit(30),
-      ]);
-      result.analytics_24h = res24h.status === "fulfilled" ? res24h.value.data : null;
-      result.analytics_7d = res7d.status === "fulfilled" ? res7d.value.data : null;
-      result.unique_visitors_24h = uvRes.status === "fulfilled" ? uvRes.value.data : null;
-      result.live_users = liveRes.status === "fulfilled" ? liveRes.value.data : null;
-      result.mau = mauRes.status === "fulfilled" ? mauRes.value.data : null;
-      result.top_pages_7d = pagesRes.status === "fulfilled" ? (pagesRes.value.data ?? []) : [];
-      result.conversion_funnel_30d = funnelRes.status === "fulfilled" ? funnelRes.value.data : null;
-      result.market_watch_usage_7d = mwRes.status === "fulfilled" ? mwRes.value.data : null;
-      result.analytics_daily = adRes.status === "fulfilled" ? (adRes.value.data ?? []) : [];
-    }
-
+    // ── SUBSCRIPTION METRICS (real data: v_admin_subscription_metrics → profiles) ─
     if (section === "all" || section === "analytics_product") {
-      const [subRes, dauRes, wauRes, featureRes, funnelRes, aiRes, powerRes, realtimeRes, dailyRes] = await Promise.allSettled([
-        db.from("v_admin_subscription_metrics").select("*").maybeSingle(),
-        db.from("v_admin_dau").select("*").maybeSingle(),
-        db.from("v_admin_wau").select("*").maybeSingle(),
-        db.from("v_admin_feature_usage").select("*").limit(10),
-        db.from("v_admin_conversion_funnel").select("*").maybeSingle(),
-        db.from("v_admin_ai_usage").select("*").maybeSingle(),
-        db.from("v_admin_start_sit_power_users").select("*").limit(20),
-        db.from("v_admin_realtime_users").select("*").maybeSingle(),
-        db.from("v_admin_daily_usage").select("*").limit(14),
-      ]);
-      result.subscription_metrics = subRes.status === "fulfilled" ? subRes.value.data : null;
-      result.dau = dauRes.status === "fulfilled" ? dauRes.value.data : null;
-      result.wau = wauRes.status === "fulfilled" ? wauRes.value.data : null;
-      result.feature_usage = featureRes.status === "fulfilled" ? (featureRes.value.data ?? []) : [];
-      result.conversion_funnel = funnelRes.status === "fulfilled" ? funnelRes.value.data : null;
-      result.ai_usage = aiRes.status === "fulfilled" ? aiRes.value.data : null;
-      result.power_users = powerRes.status === "fulfilled" ? (powerRes.value.data ?? []) : [];
-      result.realtime_users = realtimeRes.status === "fulfilled" ? realtimeRes.value.data : null;
-      result.daily_usage = dailyRes.status === "fulfilled" ? (dailyRes.value.data ?? []) : [];
+      const subRes = await db.from("v_admin_subscription_metrics").select("*").maybeSingle();
+      result.subscription_metrics = subRes.data ?? null;
     }
 
+    // ── GROWTH / SIGNUPS (real data: profiles table) ──────────────────────────
     if (section === "all" || section === "analytics_growth") {
-      const [signupRes, signupDailyRes, utmRes, playersRes, revenueRes] = await Promise.allSettled([
-        adminDb.from("v_signups_7d" as never).select("*").maybeSingle(),
-        adminDb.from("v_signups_daily" as never).select("*").limit(30),
-        adminDb.from("v_utm_traffic_sources_7d" as never).select("*").limit(20),
-        adminDb.from("v_top_viewed_players_7d" as never).select("*").limit(20),
-        adminDb.from("v_revenue_estimate" as never).select("*").maybeSingle(),
-      ]);
-      result.signup_metrics = signupRes.status === "fulfilled" ? signupRes.value.data : null;
-      result.signup_daily = signupDailyRes.status === "fulfilled" ? (signupDailyRes.value.data ?? []) : [];
-      result.utm_sources = utmRes.status === "fulfilled" ? (utmRes.value.data ?? []) : [];
-      result.top_players = playersRes.status === "fulfilled" ? (playersRes.value.data ?? []) : [];
-      result.revenue_estimate = revenueRes.status === "fulfilled" ? revenueRes.value.data : null;
+      const signupRes = await db.from("v_admin_subscription_metrics").select("*").maybeSingle();
+      const revenueRes = await db
+        .from("subscriptions")
+        .select("id, status, price_id, current_period_end")
+        .in("status", ["active", "trialing"]);
+
+      result.signup_metrics = signupRes.data
+        ? {
+            signups_24h: signupRes.data.signups_24h ?? 0,
+            signups_7d: signupRes.data.signups_7d ?? 0,
+            signups_30d: signupRes.data.signups_30d ?? 0,
+            total_signups: signupRes.data.total_profiles ?? 0,
+          }
+        : null;
+
+      const activeSubs = revenueRes.data ?? [];
+      result.revenue_estimate = {
+        active_subs: activeSubs.length,
+        trial_subs: activeSubs.filter((s: { status: string }) => s.status === "trialing").length,
+        mrr_if_all_monthly: activeSubs.length * 9.99,
+        arr_if_all_yearly: activeSubs.length * 99,
+      };
     }
 
-    if (section === "all" || section === "analytics_funnel") {
-      const { data: funnelData } = await db.rpc("get_analytics_funnel_7d" as never);
-      const row = Array.isArray(funnelData) ? funnelData[0] : funnelData;
-      result.live_funnel = row ?? null;
+    // ── SUBSCRIBERS LIST (full per-user table) ────────────────────────────────
+    if (section === "subscribers") {
+      const { data: subs } = await db
+        .from("v_user_access")
+        .select("id, email, subscription_status, is_active, is_canceled, is_manual_premium, billing_period_end, premium_expires_at, manual_premium_expires_at, created_at")
+        .order("is_active", { ascending: false })
+        .order("billing_period_end", { ascending: false, nullsFirst: false });
+      result.subscribers = subs ?? [];
     }
 
-    if (section === "all" || section === "health") {
-      const [pipelineRunsRes, healthRes, aiWorkerRes, startSitRes, cronRes, identityRes, cronStatusRes, systemLogsRes] = await Promise.allSettled([
-        db.from("v_pipeline_run_detail").select("*").order("started_at", { ascending: false }).limit(20),
-        db.from("v_pipeline_health").select("*").maybeSingle(),
-        db.from("v_ai_worker_health").select("*").maybeSingle(),
-        db.from("v_start_sit_cache_health").select("*").maybeSingle(),
-        db.rpc("get_cron_job_status"),
-        adminDb.from("v_player_identity_issues" as never).select("*").limit(50),
-        db.from("v_admin_cron_status").select("*"),
-        db.from("system_logs").select("id,log_level,source,event_type,message,created_at").order("created_at", { ascending: false }).limit(50),
-      ]);
-      result.pipeline_run_detail = pipelineRunsRes.status === "fulfilled" ? (pipelineRunsRes.value.data ?? []) : [];
-      result.pipeline_health = healthRes.status === "fulfilled" ? healthRes.value.data : null;
-      result.ai_worker_health = aiWorkerRes.status === "fulfilled" ? aiWorkerRes.value.data : null;
-      result.start_sit_cache_health = startSitRes.status === "fulfilled" ? startSitRes.value.data : null;
-      result.cron_jobs = cronRes.status === "fulfilled" ? (cronRes.value.data ?? []) : [];
-      result.player_identity_issues = identityRes.status === "fulfilled" ? (identityRes.value.data ?? []) : [];
-      result.cron_status = cronStatusRes.status === "fulfilled" ? (cronStatusRes.value.data ?? []) : [];
-      result.system_logs = systemLogsRes.status === "fulfilled" ? (systemLogsRes.value.data ?? []) : [];
-    }
-
+    // ── PIPELINE RUNS ─────────────────────────────────────────────────────────
     if (section === "pipeline_runs") {
       const { data: runs } = await db
         .from("v_pipeline_run_detail")
@@ -169,6 +124,7 @@ Deno.serve(async (req: Request) => {
       result.pipeline_runs = runs ?? [];
     }
 
+    // ── PIPELINE STEPS ────────────────────────────────────────────────────────
     if (section === "pipeline_steps") {
       const runId = body?.run_id as string | undefined;
       if (runId) {
@@ -183,17 +139,26 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    if (section === "subscribers") {
-      const { data: subs } = await db
-        .from("profiles")
-        .select("id, email, subscription_status, billing_period_end, premium_expires_at, is_manual_premium, manual_premium_expires_at")
-        .order("billing_period_end", { ascending: false });
-      result.subscribers = subs ?? [];
+    // ── HEALTH ────────────────────────────────────────────────────────────────
+    if (section === "all" || section === "health") {
+      const [pipelineRunsRes, healthRes, aiWorkerRes, cronRes, systemLogsRes] = await Promise.allSettled([
+        db.from("v_pipeline_run_detail").select("*").order("started_at", { ascending: false }).limit(20),
+        db.from("v_pipeline_health").select("*").maybeSingle(),
+        db.from("v_ai_worker_health").select("*").maybeSingle(),
+        db.rpc("get_cron_job_status"),
+        db.from("system_logs").select("id,log_level,source,event_type,message,created_at").order("created_at", { ascending: false }).limit(50),
+      ]);
+      result.pipeline_run_detail = pipelineRunsRes.status === "fulfilled" ? (pipelineRunsRes.value.data ?? []) : [];
+      result.pipeline_health = healthRes.status === "fulfilled" ? healthRes.value.data : null;
+      result.ai_worker_health = aiWorkerRes.status === "fulfilled" ? aiWorkerRes.value.data : null;
+      result.cron_jobs = cronRes.status === "fulfilled" ? (cronRes.value.data ?? []) : [];
+      result.system_logs = systemLogsRes.status === "fulfilled" ? (systemLogsRes.value.data ?? []) : [];
     }
 
-    if (section === "all" || section === "command_logs") {
-      const { data: logs } = await adminDb
-        .from("command_logs" as never)
+    // ── COMMAND LOGS ──────────────────────────────────────────────────────────
+    if (section === "command_logs") {
+      const { data: logs } = await db
+        .from("command_logs")
         .select("id,command,status,duration_ms,error,created_at")
         .order("created_at", { ascending: false })
         .limit(30);

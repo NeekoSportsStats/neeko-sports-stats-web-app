@@ -8,43 +8,24 @@ interface SubscriberRow {
   id: string;
   email: string | null;
   subscription_status: string | null;
+  is_active: boolean;
+  is_canceled: boolean;
+  is_manual_premium: boolean;
   billing_period_end: string | null;
   premium_expires_at: string | null;
-  is_manual_premium: boolean;
   manual_premium_expires_at: string | null;
+  created_at: string | null;
 }
 
 type FilterType = "all" | "active" | "cancelled" | "expired";
 
-function deriveAccessStatus(row: SubscriberRow): "active" | "expired" {
-  const now = Date.now();
-  if (row.is_manual_premium) {
-    if (!row.manual_premium_expires_at) return "active";
-    if (new Date(row.manual_premium_expires_at).getTime() > now) return "active";
-  }
-  if (row.premium_expires_at && new Date(row.premium_expires_at).getTime() > now) return "active";
-  if (
-    row.subscription_status &&
-    ["active", "trialing"].includes(row.subscription_status) &&
-    row.billing_period_end &&
-    new Date(row.billing_period_end).getTime() > now
-  ) return "active";
-  return "expired";
-}
-
-function formatExpiry(row: SubscriberRow): string {
-  const candidates: (string | null)[] = [
-    row.billing_period_end,
-    row.premium_expires_at,
-    row.manual_premium_expires_at,
-  ];
-  const valid = candidates
+function bestExpiry(row: SubscriberRow): string {
+  const candidates = [row.billing_period_end, row.premium_expires_at, row.manual_premium_expires_at]
     .filter(Boolean)
     .map((d) => new Date(d!).getTime())
     .filter((t) => !isNaN(t));
-  if (!valid.length) return "—";
-  const latest = Math.max(...valid);
-  return new Date(latest).toLocaleDateString("en-AU", {
+  if (!candidates.length) return "—";
+  return new Date(Math.max(...candidates)).toLocaleDateString("en-AU", {
     day: "2-digit",
     month: "short",
     year: "numeric",
@@ -60,17 +41,17 @@ function StripeStatusBadge({ status }: { status: string | null }) {
   return <Badge variant="secondary" className="text-xs">{status}</Badge>;
 }
 
-function AccessBadge({ status }: { status: "active" | "expired" }) {
-  if (status === "active")
+function AccessBadge({ active }: { active: boolean }) {
+  if (active)
     return <Badge className="text-xs bg-emerald-100 text-emerald-800 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-300">active</Badge>;
   return <Badge className="text-xs bg-red-100 text-red-800 border-red-200 dark:bg-red-900/30 dark:text-red-300">expired</Badge>;
 }
 
 const FILTERS: { id: FilterType; label: string }[] = [
-  { id: "all", label: "All" },
-  { id: "active", label: "Active" },
+  { id: "all",       label: "All" },
+  { id: "active",    label: "Active" },
   { id: "cancelled", label: "Cancelled" },
-  { id: "expired", label: "Expired" },
+  { id: "expired",   label: "Expired" },
 ];
 
 export function SubscriberTable() {
@@ -93,17 +74,15 @@ export function SubscriberTable() {
   useEffect(() => { load(); }, [load]);
 
   const filtered = rows.filter((row) => {
-    const access = deriveAccessStatus(row);
-    const stripe = row.subscription_status ?? "";
-    if (filter === "active") return access === "active";
-    if (filter === "expired") return access === "expired";
-    if (filter === "cancelled") return stripe === "canceled" || stripe === "cancelled";
+    if (filter === "active") return row.is_active;
+    if (filter === "expired") return !row.is_active;
+    if (filter === "cancelled") return row.is_canceled;
     return true;
   });
 
-  const activeCount = rows.filter((r) => deriveAccessStatus(r) === "active").length;
-  const cancelledCount = rows.filter((r) => ["canceled", "cancelled"].includes(r.subscription_status ?? "")).length;
-  const expiredCount = rows.filter((r) => deriveAccessStatus(r) === "expired").length;
+  const activeCount = rows.filter((r) => r.is_active).length;
+  const cancelledCount = rows.filter((r) => r.is_canceled).length;
+  const expiredCount = rows.filter((r) => !r.is_active).length;
 
   return (
     <div className="space-y-4">
@@ -142,7 +121,7 @@ export function SubscriberTable() {
       {loading && rows.length === 0 ? (
         <div className="py-12 text-center text-sm text-muted-foreground">Loading subscribers...</div>
       ) : filtered.length === 0 ? (
-        <div className="py-12 text-center text-sm text-muted-foreground">No subscribers match this filter.</div>
+        <div className="py-12 text-center text-sm text-muted-foreground">No users match this filter.</div>
       ) : (
         <div className="overflow-x-auto rounded-md border border-border">
           <table className="w-full text-sm">
@@ -151,35 +130,39 @@ export function SubscriberTable() {
                 <th className="text-left px-4 py-2.5 text-xs font-medium text-muted-foreground">Email</th>
                 <th className="text-left px-4 py-2.5 text-xs font-medium text-muted-foreground">Stripe Status</th>
                 <th className="text-left px-4 py-2.5 text-xs font-medium text-muted-foreground">Access</th>
+                <th className="text-left px-4 py-2.5 text-xs font-medium text-muted-foreground">Cancelled</th>
                 <th className="text-left px-4 py-2.5 text-xs font-medium text-muted-foreground">Expiry</th>
               </tr>
             </thead>
             <tbody>
-              {filtered.map((row) => {
-                const access = deriveAccessStatus(row);
-                return (
-                  <tr
-                    key={row.id}
-                    className="border-b border-border/50 last:border-0 hover:bg-muted/30 transition-colors"
-                  >
-                    <td className="px-4 py-2.5 font-mono text-xs text-foreground max-w-[240px] truncate">
-                      {row.email ?? <span className="text-muted-foreground">—</span>}
-                      {row.is_manual_premium && (
-                        <span className="ml-2 text-[10px] text-amber-600 dark:text-amber-400 font-semibold">MANUAL</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-2.5">
-                      <StripeStatusBadge status={row.subscription_status} />
-                    </td>
-                    <td className="px-4 py-2.5">
-                      <AccessBadge status={access} />
-                    </td>
-                    <td className="px-4 py-2.5 text-xs text-muted-foreground">
-                      {formatExpiry(row)}
-                    </td>
-                  </tr>
-                );
-              })}
+              {filtered.map((row) => (
+                <tr
+                  key={row.id}
+                  className="border-b border-border/50 last:border-0 hover:bg-muted/30 transition-colors"
+                >
+                  <td className="px-4 py-2.5 font-mono text-xs text-foreground max-w-[240px] truncate">
+                    {row.email ?? <span className="text-muted-foreground italic">no email</span>}
+                    {row.is_manual_premium && (
+                      <span className="ml-2 text-[10px] text-amber-600 dark:text-amber-400 font-semibold">MANUAL</span>
+                    )}
+                  </td>
+                  <td className="px-4 py-2.5">
+                    <StripeStatusBadge status={row.subscription_status} />
+                  </td>
+                  <td className="px-4 py-2.5">
+                    <AccessBadge active={row.is_active} />
+                  </td>
+                  <td className="px-4 py-2.5 text-xs">
+                    {row.is_canceled
+                      ? <span className="text-amber-600 dark:text-amber-400 font-medium">Yes</span>
+                      : <span className="text-muted-foreground">No</span>
+                    }
+                  </td>
+                  <td className="px-4 py-2.5 text-xs text-muted-foreground">
+                    {bestExpiry(row)}
+                  </td>
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>
