@@ -43,11 +43,13 @@ Deno.serve(async (req: Request) => {
       return new Response(`Signature verification failed: ${err.message}`, { status: 400, headers: corsHeaders });
     }
 
-    console.log(`Received event: ${event.type} [${event.id}]`);
+    console.log(`Webhook event: ${event.type} [${event.id}]`);
 
     await supabase.from('stripe_webhook_events').insert({
       event_type: event.type,
       payload: event as unknown as Record<string, unknown>,
+    }).then(({ error }) => {
+      if (error) console.warn('Failed to log webhook event:', error.message);
     });
 
     EdgeRuntime.waitUntil(handleEvent(event));
@@ -58,7 +60,7 @@ Deno.serve(async (req: Request) => {
     });
   } catch (err: any) {
     console.error('Unhandled webhook error:', err);
-    return new Response(JSON.stringify({ error: "Request failed" }), {
+    return new Response(JSON.stringify({ error: 'Request failed' }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
@@ -117,6 +119,44 @@ async function handleEvent(event: Stripe.Event) {
   }
 }
 
+async function resolveUserId(customerId: string): Promise<string | null> {
+  const { data, error } = await supabase
+    .from('stripe_customers')
+    .select('user_id')
+    .eq('customer_id', customerId)
+    .maybeSingle();
+
+  if (error) {
+    console.error('resolveUserId query error:', error);
+  }
+
+  if (data?.user_id) return data.user_id;
+
+  const { data: profileData, error: profileError } = await supabase
+    .from('profiles')
+    .select('id')
+    .eq('stripe_customer_id', customerId)
+    .maybeSingle();
+
+  if (profileError) {
+    console.error('resolveUserId profiles fallback error:', profileError);
+  }
+
+  return profileData?.id ?? null;
+}
+
+async function isManualPremium(userId: string): Promise<boolean> {
+  const { data } = await supabase
+    .from('profiles')
+    .select('is_manual_premium, manual_premium_expires_at')
+    .eq('id', userId)
+    .maybeSingle();
+
+  if (!data?.is_manual_premium) return false;
+  if (!data.manual_premium_expires_at) return true;
+  return new Date(data.manual_premium_expires_at) > new Date();
+}
+
 async function syncCustomerFromStripe(customerId: string) {
   console.log(`Syncing customer: ${customerId}`);
 
@@ -136,13 +176,25 @@ async function syncCustomerFromStripe(customerId: string) {
       .upsert({ customer_id: customerId, status: 'not_started' }, { onConflict: 'customer_id' });
 
     if (userId) {
-      await deactivateProfile(userId, customerId);
+      const manualOverride = await isManualPremium(userId);
+      if (!manualOverride) {
+        await deactivateProfile(userId, customerId);
+      } else {
+        console.log(`Skipping deactivation for manual premium user: ${userId}`);
+      }
     }
     return;
   }
 
   const subscription = subscriptions.data[0];
   const isActive = subscription.status === 'active' || subscription.status === 'trialing';
+
+  const periodStart = subscription.current_period_start
+    ? new Date(subscription.current_period_start * 1000).toISOString()
+    : null;
+  const periodEnd = subscription.current_period_end
+    ? new Date(subscription.current_period_end * 1000).toISOString()
+    : null;
 
   const { error: subError } = await supabase.from('stripe_subscriptions').upsert(
     {
@@ -176,23 +228,25 @@ async function syncCustomerFromStripe(customerId: string) {
     return;
   }
 
-  const periodEnd = subscription.current_period_end
-    ? new Date(subscription.current_period_end * 1000).toISOString()
-    : null;
+  // Guard: never downgrade a manual premium user
+  const manualOverride = await isManualPremium(userId);
+  if (manualOverride && !isActive) {
+    console.log(`Skipping profile downgrade for manual premium user: ${userId}`);
+    return;
+  }
 
+  // Update profile using the actual profiles schema columns
   const { error: profileError } = await supabase
     .from('profiles')
     .upsert(
       {
         id: userId,
-        is_premium: isActive,
-        is_active: isActive,
-        plan: isActive ? 'premium' : 'free',
         stripe_customer_id: customerId,
         stripe_subscription_id: subscription.id,
         subscription_status: subscription.status,
-        subscription_tier: isActive ? 'premium' : 'free',
-        current_period_end: periodEnd,
+        billing_period_start: periodStart,
+        billing_period_end: periodEnd,
+        premium_expires_at: isActive ? periodEnd : null,
         updated_at: new Date().toISOString(),
       },
       { onConflict: 'id' }
@@ -201,9 +255,10 @@ async function syncCustomerFromStripe(customerId: string) {
   if (profileError) {
     console.error('profiles upsert error:', profileError);
   } else {
-    console.log(`profiles upserted: user=${userId}, is_premium=${isActive}, is_active=${isActive}, plan=${isActive ? 'premium' : 'free'}`);
+    console.log(`profiles updated: user=${userId}, subscription_status=${subscription.status}`);
   }
 
+  // Also sync the subscriptions table
   const { error: subTableError } = await supabase.from('subscriptions').upsert(
     {
       user_id: userId,
@@ -211,20 +266,18 @@ async function syncCustomerFromStripe(customerId: string) {
       stripe_customer_id: customerId,
       stripe_subscription_id: subscription.id,
       status: subscription.status,
-      current_period_start: subscription.current_period_start
-        ? new Date(subscription.current_period_start * 1000).toISOString()
-        : null,
+      current_period_start: periodStart,
       current_period_end: periodEnd,
       updated_at: new Date().toISOString(),
     },
     { onConflict: 'stripe_subscription_id' }
-  );
+  ).then(({ error }) => {
+    if (error) console.warn('subscriptions upsert (non-fatal):', error.message);
+    else console.log(`subscriptions table updated for user: ${userId}`);
+    return { error };
+  });
 
-  if (subTableError) {
-    console.error('subscriptions upsert error:', subTableError);
-  } else {
-    console.log(`subscriptions table updated for user: ${userId}`);
-  }
+  void subTableError;
 }
 
 async function deactivateCustomer(customerId: string) {
@@ -236,22 +289,26 @@ async function deactivateCustomer(customerId: string) {
 
   const userId = await resolveUserId(customerId);
   if (userId) {
-    await deactivateProfile(userId, customerId);
+    const manualOverride = await isManualPremium(userId);
+    if (!manualOverride) {
+      await deactivateProfile(userId, customerId);
+    } else {
+      console.log(`Skipping cancellation deactivation for manual premium user: ${userId}`);
+    }
   }
 }
 
-async function deactivateProfile(userId: string, customerId: string) {
+async function deactivateProfile(userId: string, _customerId: string) {
   const { error } = await supabase
     .from('profiles')
     .update({
-      is_premium: false,
-      is_active: false,
-      plan: 'free',
       subscription_status: 'canceled',
-      subscription_tier: 'free',
+      premium_expires_at: null,
+      billing_period_end: null,
       updated_at: new Date().toISOString(),
     })
-    .eq('id', userId);
+    .eq('id', userId)
+    .eq('is_manual_premium', false);
 
   if (error) {
     console.error(`Failed to deactivate profile for user ${userId}:`, error);
@@ -282,30 +339,4 @@ async function trackAnalyticsEvent(
   } catch (err: any) {
     console.warn(`[analytics] trackAnalyticsEvent(${eventName}) threw:`, err?.message);
   }
-}
-
-async function resolveUserId(customerId: string): Promise<string | null> {
-  const { data, error } = await supabase
-    .from('stripe_customers')
-    .select('user_id')
-    .eq('customer_id', customerId)
-    .maybeSingle();
-
-  if (error) {
-    console.error('resolveUserId query error:', error);
-  }
-
-  if (data?.user_id) return data.user_id;
-
-  const { data: profileData, error: profileError } = await supabase
-    .from('profiles')
-    .select('id')
-    .eq('stripe_customer_id', customerId)
-    .maybeSingle();
-
-  if (profileError) {
-    console.error('resolveUserId profiles fallback error:', profileError);
-  }
-
-  return profileData?.id ?? null;
 }
