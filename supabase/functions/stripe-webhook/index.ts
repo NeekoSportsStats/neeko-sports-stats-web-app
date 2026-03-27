@@ -259,8 +259,9 @@ async function syncCustomerFromStripe(customerId: string) {
         subscription_status: subscription.status,
         billing_period_start: periodStart,
         billing_period_end: periodEnd,
-        // premium_expires_at mirrors billing_period_end when active — used as Condition 3 fallback
-        premium_expires_at: isActive ? periodEnd : null,
+        // premium_expires_at always mirrors billing_period_end — access runs until period end
+        // even after cancellation (Condition 3 fallback, aligned with get_access_state logic)
+        premium_expires_at: periodEnd,
         updated_at: new Date().toISOString(),
       },
       { onConflict: 'id' }
@@ -289,12 +290,13 @@ async function deactivateCustomer(customerId: string) {
 async function deactivateProfile(userId: string) {
   console.log(`stripe-webhook: deactivateProfile — user=${userId}`);
 
+  // NOTE: billing_period_end and premium_expires_at are intentionally preserved.
+  // Cancelled users retain access until billing_period_end passes.
+  // get_access_state() and v_user_access both enforce the date check.
   const { error } = await supabase
     .from('profiles')
     .update({
       subscription_status: 'canceled',
-      premium_expires_at: null,
-      billing_period_end: null,
       updated_at: new Date().toISOString(),
     })
     .eq('id', userId)
