@@ -5,13 +5,15 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { RefreshCw, ChartBar as BarChart3Icon, Users, Activity, TrendingUp, CalendarDays, ArrowUpRight } from "lucide-react";
 
-type AnalyticsTab = "usage" | "product" | "growth";
+type AnalyticsTab = "usage" | "product" | "growth" | "subscribers";
 
 const ANALYTICS_TABS: { id: AnalyticsTab; label: string }[] = [
-  { id: "usage",   label: "Site Usage" },
-  { id: "product", label: "Product" },
-  { id: "growth",  label: "Growth" },
+  { id: "usage",       label: "Site Usage" },
+  { id: "product",     label: "Product" },
+  { id: "growth",      label: "Growth" },
+  { id: "subscribers", label: "Subscribers" },
 ];
+import { SubscriberTable } from "../subscribers/SubscriberTable";
 import {
   StatRow,
   SectionCard,
@@ -633,6 +635,13 @@ export default function AdminAnalytics() {
           </SectionCard>
         </div>
       </div>)}
+
+      {/* Subscribers tab */}
+      {activeTab === "subscribers" && (
+        <div className="mt-2">
+          <SubscriberTable />
+        </div>
+      )}
 
     </div>
   );

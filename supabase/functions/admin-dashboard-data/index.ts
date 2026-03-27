@@ -183,6 +183,14 @@ Deno.serve(async (req: Request) => {
       }
     }
 
+    if (section === "subscribers") {
+      const { data: subs } = await db
+        .from("profiles")
+        .select("id, email, subscription_status, billing_period_end, premium_expires_at, is_manual_premium, manual_premium_expires_at")
+        .order("billing_period_end", { ascending: false });
+      result.subscribers = subs ?? [];
+    }
+
     if (section === "all" || section === "command_logs") {
       const { data: logs } = await adminDb
         .from("command_logs" as never)
