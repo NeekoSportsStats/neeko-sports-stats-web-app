@@ -142,6 +142,7 @@ Deno.serve(async (req) => {
     let customerId: string;
 
     if (!customer?.customer_id) {
+      // Create new Stripe customer
       const newCustomer = await stripe.customers.create({
         email: user.email,
         metadata: { userId: user.id },
@@ -161,43 +162,9 @@ Deno.serve(async (req) => {
         return err('Failed to create customer record', 500);
       }
 
-      const { error: subErr } = await supabase
-        .from('stripe_subscriptions')
-        .insert({ customer_id: newCustomer.id, status: 'not_started' });
-
-      if (subErr) {
-        console.error('stripe-checkout: failed to create subscription record', subErr);
-        try {
-          await stripe.customers.del(newCustomer.id);
-        } catch (_) { /* ignore */ }
-        return err('Failed to create subscription record', 500);
-      }
-
       customerId = newCustomer.id;
     } else {
       customerId = customer.customer_id;
-
-      const { data: sub, error: subErr } = await supabase
-        .from('stripe_subscriptions')
-        .select('status')
-        .eq('customer_id', customerId)
-        .maybeSingle();
-
-      if (subErr) {
-        console.error('stripe-checkout: failed to fetch subscription', subErr);
-        return err('Failed to fetch subscription information', 500);
-      }
-
-      if (!sub) {
-        const { error: createSubErr } = await supabase
-          .from('stripe_subscriptions')
-          .insert({ customer_id: customerId, status: 'not_started' });
-
-        if (createSubErr) {
-          console.error('stripe-checkout: failed to create sub record for existing customer', createSubErr);
-          return err('Failed to create subscription record', 500);
-        }
-      }
     }
 
     console.log('stripe-checkout: creating session', { customerId, price_id, plan });
@@ -227,7 +194,6 @@ Deno.serve(async (req) => {
       code: e?.code,
       param: e?.param,
       statusCode: e?.statusCode,
-      stack: e?.stack,
     });
 
     return err('Unable to start checkout session', 500);

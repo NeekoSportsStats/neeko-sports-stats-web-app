@@ -109,12 +109,6 @@ async function handleEvent(event: Stripe.Event) {
         console.log(`stripe-webhook: subscription.created — sub=${sub.id}, customer=${sub.customer}, status=${sub.status}`);
         if (sub.customer) {
           await syncCustomerFromStripe(sub.customer as string);
-          await trackAnalyticsEvent('subscription_created', null, {
-            customer_id: sub.customer as string,
-            plan: sub.items?.data?.[0]?.price?.id ?? null,
-            status: sub.status,
-            interval: sub.items?.data?.[0]?.price?.recurring?.interval ?? null,
-          });
         }
         break;
       }
@@ -157,6 +151,7 @@ async function handleEvent(event: Stripe.Event) {
 }
 
 async function resolveUserId(customerId: string): Promise<string | null> {
+  // Primary: stripe_customers table
   const { data, error } = await supabase
     .from('stripe_customers')
     .select('user_id')
@@ -172,7 +167,7 @@ async function resolveUserId(customerId: string): Promise<string | null> {
     return data.user_id;
   }
 
-  // Fallback: check profiles.stripe_customer_id
+  // Fallback: profiles.stripe_customer_id
   const { data: profileData, error: profileError } = await supabase
     .from('profiles')
     .select('id')
@@ -218,14 +213,10 @@ async function syncCustomerFromStripe(customerId: string) {
 
   if (subscriptions.data.length === 0) {
     console.log(`stripe-webhook: no subscriptions found for customer ${customerId}`);
-    await supabase
-      .from('stripe_subscriptions')
-      .upsert({ customer_id: customerId, status: 'not_started' }, { onConflict: 'customer_id' });
-
     if (userId) {
       const manualOverride = await isManualPremium(userId);
       if (!manualOverride) {
-        await deactivateProfile(userId, customerId);
+        await deactivateProfile(userId);
       } else {
         console.log(`stripe-webhook: skipping deactivation — user ${userId} has manual premium`);
       }
@@ -245,47 +236,19 @@ async function syncCustomerFromStripe(customerId: string) {
     ? new Date(subscription.current_period_end * 1000).toISOString()
     : null;
 
-  // Update stripe_subscriptions table
-  const { error: subError } = await supabase.from('stripe_subscriptions').upsert(
-    {
-      customer_id: customerId,
-      subscription_id: subscription.id,
-      price_id: subscription.items.data[0]?.price?.id ?? null,
-      status: subscription.status,
-      current_period_start: subscription.current_period_start,
-      current_period_end: subscription.current_period_end,
-      cancel_at_period_end: subscription.cancel_at_period_end,
-      updated_at: new Date().toISOString(),
-      ...(subscription.default_payment_method &&
-      typeof subscription.default_payment_method !== 'string'
-        ? {
-            payment_method_brand: (subscription.default_payment_method as Stripe.PaymentMethod).card?.brand ?? null,
-            payment_method_last4: (subscription.default_payment_method as Stripe.PaymentMethod).card?.last4 ?? null,
-          }
-        : {}),
-    },
-    { onConflict: 'customer_id' }
-  );
-
-  if (subError) {
-    console.error('stripe-webhook: stripe_subscriptions upsert error:', subError.message);
-  } else {
-    console.log(`stripe-webhook: stripe_subscriptions updated — customer=${customerId}, status=${subscription.status}`);
-  }
-
   if (!userId) {
     console.warn(`stripe-webhook: no user found for customer ${customerId} — profile NOT updated`);
     return;
   }
 
-  // Guard: never downgrade a manual premium user
+  // Guard: never downgrade a manual premium user via Stripe cancellation
   const manualOverride = await isManualPremium(userId);
   if (manualOverride && !isActive) {
     console.log(`stripe-webhook: skipping profile downgrade — user ${userId} has manual premium`);
     return;
   }
 
-  // Update profiles using the REAL schema columns (subscription_status, premium_expires_at, billing_period_*)
+  // Profiles is the single source of truth for access decisions
   const { error: profileError } = await supabase
     .from('profiles')
     .upsert(
@@ -296,6 +259,7 @@ async function syncCustomerFromStripe(customerId: string) {
         subscription_status: subscription.status,
         billing_period_start: periodStart,
         billing_period_end: periodEnd,
+        // premium_expires_at mirrors billing_period_end when active — used as Condition 3 fallback
         premium_expires_at: isActive ? periodEnd : null,
         updated_at: new Date().toISOString(),
       },
@@ -305,47 +269,24 @@ async function syncCustomerFromStripe(customerId: string) {
   if (profileError) {
     console.error(`stripe-webhook: profiles upsert error for user ${userId}:`, profileError.message);
   } else {
-    console.log(`stripe-webhook: profiles updated — user=${userId}, subscription_status=${subscription.status}, isActive=${isActive}, premium_expires_at=${isActive ? periodEnd : null}`);
+    console.log(`stripe-webhook: profiles updated — user=${userId}, status=${subscription.status}, periodEnd=${periodEnd}`);
   }
-
-  // Also sync the subscriptions table (non-fatal if missing)
-  await supabase.from('subscriptions').upsert(
-    {
-      user_id: userId,
-      profile_id: userId,
-      stripe_customer_id: customerId,
-      stripe_subscription_id: subscription.id,
-      status: subscription.status,
-      current_period_start: periodStart,
-      current_period_end: periodEnd,
-      updated_at: new Date().toISOString(),
-    },
-    { onConflict: 'stripe_subscription_id' }
-  ).then(({ error }) => {
-    if (error) console.warn('stripe-webhook: subscriptions table upsert (non-fatal):', error.message);
-    else console.log(`stripe-webhook: subscriptions table updated for user ${userId}`);
-  });
 }
 
 async function deactivateCustomer(customerId: string) {
   console.log(`stripe-webhook: deactivateCustomer — customer=${customerId}`);
-
-  await supabase
-    .from('stripe_subscriptions')
-    .upsert({ customer_id: customerId, status: 'canceled' }, { onConflict: 'customer_id' });
-
   const userId = await resolveUserId(customerId);
   if (userId) {
     const manualOverride = await isManualPremium(userId);
     if (!manualOverride) {
-      await deactivateProfile(userId, customerId);
+      await deactivateProfile(userId);
     } else {
       console.log(`stripe-webhook: skipping cancellation — user ${userId} has manual premium`);
     }
   }
 }
 
-async function deactivateProfile(userId: string, _customerId: string) {
+async function deactivateProfile(userId: string) {
   console.log(`stripe-webhook: deactivateProfile — user=${userId}`);
 
   const { error } = await supabase
@@ -363,29 +304,5 @@ async function deactivateProfile(userId: string, _customerId: string) {
     console.error(`stripe-webhook: deactivateProfile error for user ${userId}:`, error.message);
   } else {
     console.log(`stripe-webhook: profile deactivated — user=${userId}`);
-  }
-}
-
-async function trackAnalyticsEvent(
-  eventName: string,
-  userId: string | null,
-  metadata: Record<string, unknown> = {}
-): Promise<void> {
-  try {
-    const { error } = await supabase
-      .schema('analytics' as never)
-      .from('events' as never)
-      .insert({
-        event_name: eventName,
-        user_id: userId ?? null,
-        session_id: null,
-        page: null,
-        metadata,
-      } as never);
-    if (error) {
-      console.warn(`stripe-webhook: analytics event "${eventName}" failed (non-fatal):`, error.message);
-    }
-  } catch (err: any) {
-    console.warn(`stripe-webhook: analytics event "${eventName}" threw (non-fatal):`, err?.message);
   }
 }

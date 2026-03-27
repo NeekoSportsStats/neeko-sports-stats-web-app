@@ -48,15 +48,14 @@ Deno.serve(async (req: Request) => {
       return Response.json({ error: 'Unauthorized' }, { status: 401, headers: corsHeaders });
     }
 
-    // Resolve stripe customer — check both column names for compatibility
+    // Resolve stripe customer via stripe_customers.user_id (the only valid column)
     const { data: customer } = await supabase
       .from('stripe_customers')
-      .select('customer_id, stripe_id')
-      .or(`profile_id.eq.${user.id},user_id.eq.${user.id}`)
+      .select('customer_id')
+      .eq('user_id', user.id)
       .maybeSingle();
 
-    // Also check profiles.stripe_customer_id as a fallback
-    let customerId = customer?.customer_id || customer?.stripe_id;
+    let customerId = customer?.customer_id;
 
     if (!customerId) {
       const { data: profile } = await supabase
