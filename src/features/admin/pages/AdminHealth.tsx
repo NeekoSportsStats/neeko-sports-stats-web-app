@@ -9,8 +9,9 @@ import {
   RefreshCw, Activity, Database, Bot, TrendingUp, Clock, ScrollText, Target,
   ShieldCheck, Zap, CircleCheck as CheckCircle, TriangleAlert as AlertTriangle,
   Circle as XCircle, ChartBar as BarChart2, List, ChevronRight, Flame,
-  Play, Radio, History,
+  Play, Radio, History, CreditCard,
 } from "lucide-react";
+import { supabase } from "@/lib/supabaseClient";
 import { formatDate } from "../shared/adminUtils";
 import { AdminSectionIntro } from "../shared/AdminExplain";
 import type { CommandCenterStatus } from "../shared/types";
@@ -414,7 +415,7 @@ function PipelineFlowDiagram({ nodes, running, onAction }: {
   );
 }
 
-type Tab = "pipeline" | "data" | "ai" | "logs";
+type Tab = "pipeline" | "data" | "ai" | "logs" | "subscriptions";
 
 interface CronJobRow {
   jobid: number;
@@ -831,6 +832,7 @@ export default function AdminHealth() {
     { id: "data", label: "Data Integrity" },
     { id: "ai", label: "AI Health" },
     { id: "logs", label: "Logs" },
+    { id: "subscriptions", label: "Subscriptions" },
   ];
 
   const isLoading = loading || pipelineLoading;
@@ -1280,6 +1282,239 @@ export default function AdminHealth() {
           </Card>
         </div>
       )}
+
+      {tab === "subscriptions" && <SubscriptionHealthTab />}
+    </div>
+  );
+}
+
+// ============================================================
+// Subscription Health Tab — additive, self-contained
+// ============================================================
+
+interface SubHealthIssue {
+  user_id: string;
+  email: string;
+  issue_type: string;
+  issue_description: string;
+  subscription_status: string | null;
+  billing_period_end: string | null;
+  updated_at: string | null;
+}
+
+interface SubHealthSummary {
+  total_issues: number;
+  missing_billing_period_count: number;
+  expired_active_count: number;
+  mismatch_count: number;
+  manual_expired_count: number;
+  stripe_missing_count: number;
+  stale_count: number;
+}
+
+const ISSUE_LABELS: Record<string, { label: string; level: StatusLevel }> = {
+  MISSING_BILLING_PERIOD:      { label: "Missing Billing Period",   level: "error" },
+  EXPIRED_BUT_STILL_ACTIVE_FLAG: { label: "Expired but Active Flag", level: "error" },
+  PREMIUM_EXPIRES_MISMATCH:    { label: "Expiry Mismatch",          level: "warn"  },
+  MANUAL_PREMIUM_EXPIRED:      { label: "Manual Premium Expired",   level: "warn"  },
+  STRIPE_ID_MISSING:           { label: "Stripe ID Missing",        level: "error" },
+  STALE_SUBSCRIPTION:          { label: "Stale Subscription",       level: "warn"  },
+};
+
+function SubscriptionHealthTab() {
+  const [summary, setSummary] = useState<SubHealthSummary | null>(null);
+  const [issues, setIssues]   = useState<SubHealthIssue[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [runningCheck, setRunningCheck] = useState(false);
+  const [lastChecked, setLastChecked]   = useState<Date | null>(null);
+
+  const fetchHealth = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [summaryRes, issuesRes] = await Promise.all([
+        supabase.from('v_subscription_health_summary').select('*').maybeSingle(),
+        supabase.from('v_subscription_health').select('*').order('issue_type').limit(50),
+      ]);
+      if (summaryRes.data) setSummary(summaryRes.data as SubHealthSummary);
+      if (issuesRes.data)  setIssues(issuesRes.data as SubHealthIssue[]);
+      setLastChecked(new Date());
+    } catch { /* silent */ } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { fetchHealth(); }, [fetchHealth]);
+
+  async function runEdgeCheck() {
+    setRunningCheck(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/subscription-health-check`;
+      await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session?.access_token ?? ''}`,
+        },
+      });
+      await fetchHealth();
+    } catch { /* silent */ } finally {
+      setRunningCheck(false);
+    }
+  }
+
+  const totalIssues = summary?.total_issues ?? 0;
+  const overallLevel: StatusLevel = loading ? "loading"
+    : totalIssues === 0 ? "ok"
+    : issues.some(i => ISSUE_LABELS[i.issue_type]?.level === "error") ? "error"
+    : "warn";
+
+  const summaryItems = summary ? [
+    { key: "missing_billing_period_count", label: "Missing billing period",  count: summary.missing_billing_period_count,  level: summary.missing_billing_period_count > 0 ? "error" : "ok" },
+    { key: "expired_active_count",         label: "Expired but active flag", count: summary.expired_active_count,          level: summary.expired_active_count > 0 ? "error" : "ok" },
+    { key: "mismatch_count",               label: "Expiry mismatch",         count: summary.mismatch_count,                level: summary.mismatch_count > 0 ? "warn" : "ok" },
+    { key: "manual_expired_count",         label: "Manual premium expired",  count: summary.manual_expired_count,          level: summary.manual_expired_count > 0 ? "warn" : "ok" },
+    { key: "stripe_missing_count",         label: "Stripe ID missing",       count: summary.stripe_missing_count,          level: summary.stripe_missing_count > 0 ? "error" : "ok" },
+    { key: "stale_count",                  label: "Stale subscriptions",     count: summary.stale_count,                   level: summary.stale_count > 0 ? "warn" : "ok" },
+  ] as const : [];
+
+  function fmtTs(ts: string | null | undefined) {
+    if (!ts) return "—";
+    return new Date(ts).toLocaleString("en-AU", { dateStyle: "short", timeStyle: "short" });
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center shrink-0">
+            <CreditCard className="h-4 w-4 text-muted-foreground" />
+          </div>
+          <div>
+            <p className="text-sm font-semibold text-foreground">Subscription Health</p>
+            <p className="text-[11px] text-muted-foreground">
+              Monitor-only — detects data integrity issues in subscription state.
+              {lastChecked && ` Last checked ${lastChecked.toLocaleTimeString("en-AU", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}.`}
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          <Button variant="outline" size="sm" onClick={fetchHealth} disabled={loading}>
+            <RefreshCw className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`} />
+            Refresh
+          </Button>
+          <Button variant="outline" size="sm" onClick={runEdgeCheck} disabled={runningCheck || loading}>
+            <Play className={`h-4 w-4 mr-2 ${runningCheck ? "animate-spin" : ""}`} />
+            {runningCheck ? "Running…" : "Run Check"}
+          </Button>
+        </div>
+      </div>
+
+      {/* Overall status banner */}
+      {!loading && (
+        <div className={`flex items-center gap-3 rounded-lg px-4 py-3 border text-sm font-medium ${
+          overallLevel === "ok"
+            ? "border-emerald-900/40 bg-emerald-950/20 text-emerald-400"
+            : overallLevel === "error"
+            ? "border-red-900/40 bg-red-950/20 text-red-400"
+            : "border-amber-900/40 bg-amber-950/20 text-amber-400"
+        }`}>
+          <SectionIcon status={overallLevel} />
+          {overallLevel === "ok"
+            ? "No subscription issues detected — system healthy"
+            : `${totalIssues} issue${totalIssues !== 1 ? "s" : ""} detected — review below`}
+        </div>
+      )}
+
+      {/* Summary breakdown */}
+      <div className="grid gap-2.5 grid-cols-2 sm:grid-cols-3 xl:grid-cols-6">
+        {loading
+          ? [1,2,3,4,5,6].map(i => <div key={i} className="h-20 rounded-lg border border-border bg-card animate-pulse" />)
+          : summaryItems.map(item => (
+              <Card key={item.key} className={`border ${item.level === "ok" ? "border-emerald-900/40" : item.level === "error" ? "border-red-900/40" : "border-amber-900/40"}`}>
+                <CardContent className="pt-4 pb-3 px-4">
+                  <div className={`text-xl font-bold tabular-nums mb-0.5 ${item.level === "ok" ? "text-emerald-400" : item.level === "error" ? "text-red-400" : "text-amber-400"}`}>
+                    {item.count}
+                  </div>
+                  <p className="text-[11px] text-muted-foreground leading-tight">{item.label}</p>
+                </CardContent>
+              </Card>
+            ))}
+      </div>
+
+      {/* Issues table */}
+      <Card className={`border ${
+        overallLevel === "ok" ? "border-emerald-900/60"
+        : overallLevel === "error" ? "border-red-900/60"
+        : "border-amber-900/60"
+      }`}>
+        <CardHeader className="pb-3 pt-4 px-5">
+          <CardTitle className="flex items-center gap-2 text-sm font-semibold">
+            <ShieldCheck className="h-4 w-4 text-muted-foreground" />
+            Issue Log
+            {!loading && (
+              <StatusChip
+                level={overallLevel}
+                label={totalIssues === 0 ? "Clean" : `${totalIssues} issue${totalIssues !== 1 ? "s" : ""}`}
+              />
+            )}
+            <span className="ml-auto text-[11px] text-muted-foreground font-normal">Top 50</span>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="px-5 pb-5">
+          {loading ? (
+            <div className="space-y-2">{[1,2,3].map(i => <div key={i} className="h-8 rounded bg-muted animate-pulse" />)}</div>
+          ) : issues.length === 0 ? (
+            <div className="flex items-center gap-2 py-4 text-sm text-emerald-400">
+              <CheckCircle className="h-4 w-4 shrink-0" />
+              No subscription integrity issues found
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="border-b border-border/40">
+                    <th className="text-left py-2 pr-3 text-[10px] font-medium text-muted-foreground uppercase tracking-wide">Issue</th>
+                    <th className="text-left py-2 pr-3 text-[10px] font-medium text-muted-foreground uppercase tracking-wide hidden sm:table-cell">Email</th>
+                    <th className="text-left py-2 pr-3 text-[10px] font-medium text-muted-foreground uppercase tracking-wide hidden md:table-cell">Status</th>
+                    <th className="text-left py-2 pr-3 text-[10px] font-medium text-muted-foreground uppercase tracking-wide hidden lg:table-cell">Billing End</th>
+                    <th className="text-left py-2 text-[10px] font-medium text-muted-foreground uppercase tracking-wide">Description</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {issues.map((issue, i) => {
+                    const meta = ISSUE_LABELS[issue.issue_type] ?? { label: issue.issue_type, level: "warn" as StatusLevel };
+                    return (
+                      <tr key={`${issue.user_id}-${issue.issue_type}-${i}`} className="border-b border-border/20 last:border-0 hover:bg-muted/10 transition-colors">
+                        <td className="py-2 pr-3 shrink-0">
+                          <StatusChip level={meta.level} label={meta.label} />
+                        </td>
+                        <td className="py-2 pr-3 text-muted-foreground hidden sm:table-cell max-w-[160px] truncate">
+                          {issue.email ?? "—"}
+                        </td>
+                        <td className="py-2 pr-3 hidden md:table-cell">
+                          <span className="font-mono text-[11px] text-foreground">{issue.subscription_status ?? "—"}</span>
+                        </td>
+                        <td className="py-2 pr-3 text-muted-foreground hidden lg:table-cell tabular-nums">
+                          {fmtTs(issue.billing_period_end)}
+                        </td>
+                        <td className="py-2 text-muted-foreground max-w-[260px]">
+                          <span className="line-clamp-2 leading-tight">{issue.issue_description}</span>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <p className="text-[11px] text-muted-foreground">
+        Monitor only — these issues do not block access and require manual investigation.
+        Use the Stripe dashboard or direct DB update to resolve data integrity problems.
+      </p>
     </div>
   );
 }
