@@ -413,6 +413,14 @@ export default function AFLRankingsPage() {
 
   async function openRow(row: RankingRow, rank: number, tier: RowTier, isUnlocked: boolean) {
     setSelected({ row, rank, tier, isUnlocked });
+    track("player_modal_open", {
+      player_name:  row.player_name,
+      player_id:    row.player_id,
+      position:     row.position,
+      team:         row.team,
+      is_unlocked:  isUnlocked,
+      source:       "rankings",
+    });
     const isFreeTop5 = !isPremium && tier === "full";
     if (isUnlocked || isFreeTop5) {
       const needsAI = !row.why && !row.long;

@@ -45,6 +45,7 @@ export default function Success() {
     refreshTriggeredRef.current = true;
 
     track("subscription_started", { session_id: sessionId ?? undefined });
+    track("checkout_success", { session_id: sessionId ?? undefined });
 
     const startPolling = async () => {
       setPolling(true);

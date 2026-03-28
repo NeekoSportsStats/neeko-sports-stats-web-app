@@ -160,10 +160,17 @@ export default function Account() {
     );
   }
 
-  const subscriptionActive =
-    profile.subscription_status === "active" || isPremium;
+  const subscriptionActive = isPremium;
+
+  const isCancelling =
+    isPremium &&
+    (profile.cancel_at_period_end === true ||
+      subRecord?.cancel_at_period_end === true);
 
   const getStatusBadge = (s: string) => {
+    if (s === "active" && isCancelling) {
+      return <Badge variant="secondary">CANCELLING</Badge>;
+    }
     const variants: Record<string, any> = {
       active: "default",
       trialing: "secondary",
@@ -226,7 +233,7 @@ export default function Account() {
                   <CardDescription>Your Neeko+ plan</CardDescription>
                 </div>
               </div>
-              {getStatusBadge(subscriptionActive ? "active" : "free")}
+              {getStatusBadge(subscriptionActive ? (profile.subscription_status ?? "active") : "free")}
             </div>
           </CardHeader>
 
@@ -242,16 +249,28 @@ export default function Account() {
                   </strong>
                 </p>
 
-                {(subRecord?.current_period_end || profile.current_period_end) && (
+                {(subRecord?.current_period_end || profile.current_period_end || profile.billing_period_end || profile.premium_expires_at) && (
                   <p>
-                    <span className="text-sm text-muted-foreground">Next Billing Date</span><br />
+                    <span className="text-sm text-muted-foreground">
+                      {isCancelling ? "Access Until" : "Next Billing Date"}
+                    </span><br />
                     {subRecord?.current_period_end
                       ? new Date(
                           typeof subRecord.current_period_end === "number"
                             ? subRecord.current_period_end * 1000
                             : subRecord.current_period_end
                         ).toLocaleDateString()
-                      : new Date(profile.current_period_end).toLocaleDateString()}
+                      : new Date(
+                          profile.current_period_end ??
+                          profile.billing_period_end ??
+                          profile.premium_expires_at
+                        ).toLocaleDateString()}
+                  </p>
+                )}
+
+                {isCancelling && (
+                  <p className="text-sm text-amber-600 dark:text-amber-400">
+                    Your subscription will not renew. You retain full access until the date above.
                   </p>
                 )}
 

@@ -85,27 +85,66 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // ── Filter out games already fully ingested ──────────────────────────────────
+    // ── Determine completeness per game ──────────────────────────────────────────
+    // A game is considered complete when it has >= COMPLETE_THRESHOLD player rows.
+    // AFL games have 22 starting players per side (44 total) but injury lists mean
+    // 22 is a safe lower-bound for a fully processed game.
+    // Games below this threshold are reprocessed so partial ingests self-heal.
+    const COMPLETE_THRESHOLD = 22;
+
     const gameIds = games.map((g) => g.game_id as number);
 
-    const { data: alreadyIngested } = await db
+    const { data: existingCounts } = await db
       .schema("afl")
       .from("raw_player_stats")
       .select("game_id")
       .in("game_id", gameIds);
 
-    const ingestedSet = new Set((alreadyIngested ?? []).map((r) => r.game_id as number));
-    const gamesToProcess = games.filter((g) => !ingestedSet.has(g.game_id as number));
+    // Build per-game row count
+    const rowCountByGame: Record<number, number> = {};
+    for (const r of existingCounts ?? []) {
+      const id = r.game_id as number;
+      rowCountByGame[id] = (rowCountByGame[id] ?? 0) + 1;
+    }
+
+    const gamesSkippedComplete: number[] = [];
+    const gamesReprocessedPartial: number[] = [];
+
+    const gamesToProcess = games.filter((g) => {
+      const id = g.game_id as number;
+      const existingRows = rowCountByGame[id] ?? 0;
+      if (existingRows >= COMPLETE_THRESHOLD) {
+        gamesSkippedComplete.push(id);
+        return false;
+      }
+      if (existingRows > 0) {
+        gamesReprocessedPartial.push(id);
+      }
+      return true;
+    });
 
     if (gamesToProcess.length === 0) {
-      console.log(`[player-stats] All ${games.length} completed games already have stats ingested`);
+      console.log(`[player-stats] All ${games.length} games complete (threshold=${COMPLETE_THRESHOLD}). Nothing to process.`);
       return new Response(
-        JSON.stringify({ ok: true, season, round_number: roundNumber, message: "All completed games already ingested", games_skipped: games.length, rows_upserted: 0 }),
+        JSON.stringify({
+          ok: true,
+          season,
+          round_number: roundNumber,
+          message: "All completed games already ingested",
+          games_considered: games.length,
+          games_skipped_complete: gamesSkippedComplete.length,
+          games_reprocessed_partial: 0,
+          rows_upserted: 0,
+        }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    console.log(`[player-stats] Found ${gamesToProcess.length} games needing stats (${ingestedSet.size} already ingested)`);
+    console.log(
+      `[player-stats] games_considered=${games.length} skipped_complete=${gamesSkippedComplete.length} ` +
+      `reprocessed_partial=${gamesReprocessedPartial.length} to_process=${gamesToProcess.length} ` +
+      `(threshold=${COMPLETE_THRESHOLD})`
+    );
 
     let totalUpserted = 0;
     let totalErrors = 0;
@@ -221,15 +260,16 @@ Deno.serve(async (req: Request) => {
 
     return new Response(
       JSON.stringify({
-        ok:              totalErrors === 0,
+        ok:                      totalErrors === 0,
         season,
-        round_number:    roundNumber,
-        games_found:     games.length,
-        games_skipped:   ingestedSet.size,
-        games_processed: gamesToProcess.length,
-        rows_upserted:   totalUpserted,
-        errors:          totalErrors,
-        games:           gameResults,
+        round_number:            roundNumber,
+        games_considered:        games.length,
+        games_skipped_complete:  gamesSkippedComplete.length,
+        games_reprocessed_partial: gamesReprocessedPartial.length,
+        games_processed:         gamesToProcess.length,
+        rows_upserted:           totalUpserted,
+        errors:                  totalErrors,
+        games:                   gameResults,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );

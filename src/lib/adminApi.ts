@@ -41,3 +41,7 @@ export async function fetchPipelineRuns(): Promise<Record<string, unknown>> {
 export async function fetchPipelineSteps(runId: string): Promise<Record<string, unknown>> {
   return callAdminFn("admin-dashboard-data", { section: "pipeline_steps", run_id: runId });
 }
+
+export async function fetchPostHogAnalytics(section: string = "overview"): Promise<Record<string, unknown>> {
+  return callAdminFn("admin-posthog-analytics", { section });
+}

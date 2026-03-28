@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/lib/supabaseClient";
 import { useAuth } from "@/lib/auth";
+import { track } from "@/lib/analytics";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -55,6 +56,10 @@ const NeekoPlusPurchase = () => {
   const { toast } = useToast();
 
   useEffect(() => {
+    track("view_pricing_page", { source: "neeko_plus" });
+  }, []);
+
+  useEffect(() => {
     if (isPremium) {
       console.log("User already premium");
     }
@@ -84,6 +89,8 @@ const NeekoPlusPurchase = () => {
         navigate("/auth?redirect=checkout");
         return;
       }
+
+      track("start_checkout", { plan, source: "neeko_plus_page" });
 
       const origin = window.location.origin;
 
@@ -231,11 +238,15 @@ interface PlanCardProps {
 }
 
 function PlanCard({ plan, selected, onSelect, isPremium, loading, onSubscribe }: PlanCardProps) {
+  const handleSelect = () => {
+    track("plan_selected", { plan });
+    onSelect();
+  };
   const isYearly = plan === "yearly";
 
   return (
     <Card
-      onClick={onSelect}
+      onClick={handleSelect}
       className={`relative cursor-pointer border-2 rounded-2xl bg-black/40 backdrop-blur-sm transition-all hover:-translate-y-0.5 ${
         selected ? "border-primary shadow-[0_0_30px_rgba(245,200,76,0.25)]" : "border-primary/20 hover:border-primary/40"
       }`}

@@ -2,12 +2,14 @@ import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { XCircle } from "lucide-react";
+import { Circle as XCircle } from "lucide-react";
+import { track } from "@/lib/analytics";
 
 const Cancel = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
+    track("checkout_cancelled");
     const timeout = setTimeout(() => {
       window.location.href = "https://www.neekostats.com.au/neeko-plus";
     }, 5000);

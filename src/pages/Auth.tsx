@@ -4,6 +4,7 @@ import { useSearchParams, useNavigate } from "react-router-dom";
 import { z } from "zod";
 import { supabase } from "@/lib/supabaseClient";
 import { useAuth } from "@/lib/auth";
+import { track, identifyUser } from "@/lib/analytics";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -99,6 +100,8 @@ const Auth = () => {
           return;
         }
 
+        identifyUser({ id: data.user.id, email: data.user.email });
+        track("user_logged_in", { method: "email" });
         return;
       }
 
@@ -110,7 +113,7 @@ const Auth = () => {
         return;
       }
 
-      const { error } = await supabase.auth.signUp({
+      const { data: signUpData, error } = await supabase.auth.signUp({
         email,
         password,
       });
@@ -123,6 +126,11 @@ const Auth = () => {
       if (error) {
         setFormError(error.message || "Sign up failed.");
         return;
+      }
+
+      if (signUpData?.user) {
+        identifyUser({ id: signUpData.user.id, email: signUpData.user.email });
+        track("user_signed_up", { method: "email" });
       }
     } finally {
       setLoading(false);
