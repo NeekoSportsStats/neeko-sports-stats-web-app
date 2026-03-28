@@ -31,6 +31,7 @@ export function initAnalytics() {
     api_host: host,
     capture_pageview: true, // ✅ turn ON
     persistence: "localStorage",
+    advanced_disable_feature_flags: true,
   });
 }
 
