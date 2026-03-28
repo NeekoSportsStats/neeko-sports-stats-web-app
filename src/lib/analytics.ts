@@ -1,5 +1,4 @@
 import posthog from "posthog-js";
-import { supabase } from "@/lib/supabaseClient";
 
 const SESSION_KEY = "neeko_session_id";
 
@@ -13,79 +12,53 @@ function getSessionId(): string {
   return sid;
 }
 
+/* =============================
+   INIT
+============================= */
 export function initAnalytics() {
   if (typeof window === "undefined") return;
 
   getSessionId();
 
   const key = import.meta.env.VITE_POSTHOG_KEY as string | undefined;
-  const host = (import.meta.env.VITE_POSTHOG_HOST as string | undefined) ?? "https://eu.i.posthog.com";
+  const host =
+    (import.meta.env.VITE_POSTHOG_HOST as string | undefined) ??
+    "https://eu.posthog.com"; // ✅ FIXED HOST
+
   if (!key) return;
 
   posthog.init(key, {
     api_host: host,
-    capture_pageview: false,
+    capture_pageview: true, // ✅ turn ON
     persistence: "localStorage",
   });
 }
 
+/* =============================
+   TRACK EVENT
+============================= */
 export function track(event: string, properties?: Record<string, unknown>) {
   if (typeof window === "undefined") return;
 
   try {
-    posthog.capture(event, properties);
-  } catch {
-    // silently ignore posthog failures
-  }
-
-  logEvent(event, properties);
-}
-
-export function logEvent(event: string, properties?: Record<string, unknown>) {
-  if (typeof window === "undefined") return;
-
-  try {
-    const sessionId = getSessionId();
-    const page = (properties?.page as string | undefined) ?? window.location.pathname;
-
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      const userId = session?.user?.id ?? null;
-
-      const metadata: Record<string, unknown> = {};
-      if (properties) {
-        for (const [k, v] of Object.entries(properties)) {
-          if (k !== "page") metadata[k] = v;
-        }
-      }
-
-      supabase
-        .schema("analytics" as never)
-        .from("events" as never)
-        .insert({
-          event_name: event,
-          session_id: sessionId,
-          user_id: userId,
-          page,
-          metadata: Object.keys(metadata).length > 0 ? metadata : {},
-        })
-        .then(({ error }) => {
-          if (error) console.warn("[analytics] logEvent failed:", error.message);
-        })
-        .catch((e: unknown) => {
-          console.warn("[analytics] logEvent threw:", e);
-        });
-    }).catch((e: unknown) => {
-      console.warn("[analytics] getSession failed:", e);
+    posthog.capture(event, {
+      ...properties,
+      session_id: getSessionId(), // helpful for debugging
     });
-  } catch (e) {
-    console.warn("[analytics] logEvent error:", e);
+  } catch (err) {
+    console.warn("[analytics] posthog failed:", err);
   }
 }
 
+/* =============================
+   IDENTIFY USER
+============================= */
 export function identifyUser(user: { id: string; email?: string }) {
   if (typeof window === "undefined") return;
+
   try {
     if (!user?.id) return;
+
     posthog.identify(user.id, {
       email: user.email ?? undefined,
     });
@@ -94,8 +67,12 @@ export function identifyUser(user: { id: string; email?: string }) {
   }
 }
 
+/* =============================
+   RESET USER
+============================= */
 export function resetUser() {
   if (typeof window === "undefined") return;
+
   try {
     posthog.reset();
   } catch (err) {
